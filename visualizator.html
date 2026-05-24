@@ -1983,7 +1983,7 @@
       playButton.textContent = "Play";
     }
 
-    function schedulePlayback() {
+    function schedulePlaybackLegacyBroken() {
       updateProgress(
         "source",
         pageFile
@@ -1999,6 +1999,26 @@
           : `Источник подтверждён: ссылка ${pageUrl}.`,
         "done"
       );
+      stopPlayback();
+      if (state.currentIndex >= state.snapshots.length - 1) {
+        setCurrentIndex(0);
+      }
+      playButton.textContent = "Pause";
+
+      const tick = () => {
+        if (state.currentIndex >= state.snapshots.length - 1) {
+          stopPlayback();
+          return;
+        }
+
+        setCurrentIndex(state.currentIndex + 1);
+        state.timer = setTimeout(tick, Number(speedSelect.value));
+      };
+
+      state.timer = setTimeout(tick, Number(speedSelect.value));
+    }
+
+    function schedulePlayback() {
       stopPlayback();
       if (state.currentIndex >= state.snapshots.length - 1) {
         setCurrentIndex(0);
