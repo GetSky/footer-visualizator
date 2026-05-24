@@ -21,6 +21,9 @@
       --home: #d45500;
       --away: #17394a;
       --danger: #9f1f1f;
+      --marker-size: 44px;
+      --marker-font-size: 12px;
+      --marker-tag-font-size: 12px;
       --shadow: 0 16px 40px rgba(45, 31, 11, 0.12);
     }
 
@@ -191,6 +194,49 @@
       font-size: 15px;
       font-weight: 700;
       white-space: nowrap;
+    }
+
+    #teamsLabel {
+      min-width: 0;
+      flex: 1 1 auto;
+      text-align: left;
+    }
+
+    .scoreboard {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .scoreboard-team {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .scoreboard-team.home {
+      flex-direction: row;
+    }
+
+    .scoreboard-team.away {
+      flex-direction: row;
+    }
+
+    .scoreboard-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .scoreboard-score,
+    .scoreboard-divider {
+      flex: 0 0 auto;
+      color: var(--text);
+      font-weight: 700;
     }
 
     .viewer {
@@ -384,8 +430,8 @@
 
     .player-marker {
       position: absolute;
-      width: 44px;
-      height: 44px;
+      width: var(--marker-size);
+      height: var(--marker-size);
       border-radius: 50%;
       transform: translate(-50%, -50%);
       transition:
@@ -395,7 +441,7 @@
         opacity 220ms ease;
       display: grid;
       place-items: center;
-      font: 700 12px/1 "Source Code Pro", monospace;
+      font: 700 var(--marker-font-size)/1 "Source Code Pro", monospace;
       color: #fff;
       border: 2px solid rgba(255,255,255,0.88);
       box-shadow:
@@ -450,7 +496,7 @@
       top: calc(100% + 7px);
       transform: translateX(-50%);
       white-space: nowrap;
-      font: 12px/1.2 "Source Code Pro", monospace;
+      font: var(--marker-tag-font-size)/1.2 "Source Code Pro", monospace;
       color: #fff;
       text-shadow: 0 1px 2px rgba(0,0,0,0.55);
     }
@@ -743,6 +789,12 @@
     }
 
     @media (max-width: 1120px) {
+      :root {
+        --marker-size: 38px;
+        --marker-font-size: 11px;
+        --marker-tag-font-size: 11px;
+      }
+
       .viewer {
         min-height: 100svh;
         padding: 12px;
@@ -754,6 +806,12 @@
     }
 
     @media (max-width: 760px) {
+      :root {
+        --marker-size: 32px;
+        --marker-font-size: 10px;
+        --marker-tag-font-size: 10px;
+      }
+
       .landing {
         padding: 12px;
       }
@@ -762,13 +820,62 @@
         padding: 18px;
       }
 
-      .controls,
-      .timeline {
+      .controls {
         grid-template-columns: 1fr;
       }
 
+      .timeline {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .timeline button,
+      .timeline select {
+        min-width: 0;
+      }
+
+      .timeline input[type="range"] {
+        grid-column: 1 / 4;
+      }
+
       .timeline-label {
+        grid-column: 4 / 5;
+      }
+
+      .timeline-label {
+        padding-right: 0;
+        text-align: right;
+      }
+
+      .match-bar {
+        align-items: flex-start;
+      }
+
+      #teamsLabel {
         text-align: left;
+      }
+
+      .scoreboard {
+        display: inline-grid;
+        gap: 4px;
+      }
+
+      .scoreboard-team {
+        display: inline-grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        justify-content: start;
+      }
+
+      .scoreboard-team.home,
+      .scoreboard-team.away {
+        flex-direction: unset;
+      }
+
+      .scoreboard-team.home .scoreboard-score {
+        order: -1;
+      }
+
+      .scoreboard-divider {
+        display: none;
       }
 
       .kv {
@@ -1914,11 +2021,22 @@
     function fillSummary() {
       const home = state.teams[0] || "Команда 1";
       const away = state.teams[1] || "Команда 2";
-      const scoreLabel = `${state.score[0] ?? 0}:${state.score[1] ?? 0}`;
       const currentEvent = state.events[state.currentIndex];
       const minuteLabel = currentEvent && currentEvent.time !== undefined ? `${currentEvent.time} мин` : "-";
       teamsLabel.innerHTML = state.teams.length
-        ? `${formatTeamName(home)} <span style="color: var(--text); font-weight: 700;">${scoreLabel}</span> ${formatTeamName(away)}`
+        ? `
+          <span class="scoreboard">
+            <span class="scoreboard-team home">
+              <span class="scoreboard-name team-home">${home}</span>
+              <span class="scoreboard-score">${state.score[0] ?? 0}</span>
+            </span>
+            <span class="scoreboard-divider">:</span>
+            <span class="scoreboard-team away">
+              <span class="scoreboard-score">${state.score[1] ?? 0}</span>
+              <span class="scoreboard-name team-away">${away}</span>
+            </span>
+          </span>
+        `
         : "-";
       matchMinute.textContent = minuteLabel;
     }
