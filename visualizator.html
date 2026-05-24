@@ -21,6 +21,9 @@
       --home: #d45500;
       --away: #17394a;
       --danger: #9f1f1f;
+      --marker-size: 44px;
+      --marker-font-size: 12px;
+      --marker-tag-font-size: 12px;
       --shadow: 0 16px 40px rgba(45, 31, 11, 0.12);
     }
 
@@ -384,8 +387,8 @@
 
     .player-marker {
       position: absolute;
-      width: 44px;
-      height: 44px;
+      width: var(--marker-size);
+      height: var(--marker-size);
       border-radius: 50%;
       transform: translate(-50%, -50%);
       transition:
@@ -395,7 +398,7 @@
         opacity 220ms ease;
       display: grid;
       place-items: center;
-      font: 700 12px/1 "Source Code Pro", monospace;
+      font: 700 var(--marker-font-size)/1 "Source Code Pro", monospace;
       color: #fff;
       border: 2px solid rgba(255,255,255,0.88);
       box-shadow:
@@ -450,7 +453,7 @@
       top: calc(100% + 7px);
       transform: translateX(-50%);
       white-space: nowrap;
-      font: 12px/1.2 "Source Code Pro", monospace;
+      font: var(--marker-tag-font-size)/1.2 "Source Code Pro", monospace;
       color: #fff;
       text-shadow: 0 1px 2px rgba(0,0,0,0.55);
     }
@@ -743,6 +746,12 @@
     }
 
     @media (max-width: 1120px) {
+      :root {
+        --marker-size: 38px;
+        --marker-font-size: 11px;
+        --marker-tag-font-size: 11px;
+      }
+
       .viewer {
         min-height: 100svh;
         padding: 12px;
@@ -754,6 +763,12 @@
     }
 
     @media (max-width: 760px) {
+      :root {
+        --marker-size: 32px;
+        --marker-font-size: 10px;
+        --marker-tag-font-size: 10px;
+      }
+
       .landing {
         padding: 12px;
       }
@@ -762,13 +777,30 @@
         padding: 18px;
       }
 
-      .controls,
-      .timeline {
+      .controls {
         grid-template-columns: 1fr;
       }
 
+      .timeline {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .timeline button,
+      .timeline select {
+        min-width: 0;
+      }
+
+      .timeline input[type="range"] {
+        grid-column: 1 / 4;
+      }
+
       .timeline-label {
-        text-align: left;
+        grid-column: 4 / 5;
+      }
+
+      .timeline-label {
+        padding-right: 0;
+        text-align: right;
       }
 
       .kv {
