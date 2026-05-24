@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Просмотрщик матчей Footter.com</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #efe7d1;
+      --panel: #fbf6ea;
+      --line: #cdb88c;
+      --text: #1d1b18;
+      --muted: #6d6559;
+      --accent: #b34d16;
+      --accent-2: #184f43;
+      --field: #2d8a4d;
+      --field-dark: #267643;
+      --home: #d45500;
+      --away: #17394a;
+      --danger: #9f1f1f;
+      --shadow: 0 16px 40px rgba(45, 31, 11, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Source Code Pro", monospace;
+      background:
+        linear-gradient(rgba(247, 241, 228, 0.84), rgba(239, 231, 209, 0.9)),
+        url("https://images.unsplash.com/photo-1679391029864-d46f366a456b?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+      background-position: center;
+      background-size: cover;
+      background-attachment: fixed;
+    }
+
+    main {
+      min-height: 100vh;
+    }
+
+    .landing {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .landing-card {
+      width: min(760px, 100%);
+      background: #fbf6ea;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .app-shell {
+      display: none;
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    body.loaded .landing {
+      display: none;
+    }
+
+    body.loaded .app-shell {
+      display: block;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 4.3vw, 48px);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 16px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    input[type="url"],
+    input[type="file"],
+    input[type="range"],
+    select,
+    button,
+    textarea {
+      font: inherit;
+    }
+
+    input[type="url"],
+    input[type="file"],
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 11px 16px;
+      background: #fff;
+      color: inherit;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, var(--accent), #cd6a20);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: linear-gradient(135deg, var(--accent-2), #28715f);
+    }
+
+    button.ghost {
+      background: #efe4cc;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .meta {
+      display: flex;
+      justify-content: center;
+    }
+
+    .meta-card {
+      background: #f2ead8;
+      border: 1px solid #c8bea8;
+      border-radius: 14px;
+      padding: 10px 14px;
+      min-width: 240px;
+      text-align: center;
+    }
+
+    .meta-card strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--accent-2);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .meta-card span {
+      line-height: 1.2;
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .match-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .match-minute {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .viewer {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+      min-height: 100svh;
+      padding: 14px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .source-grid.hidden {
+      display: none !important;
+    }
+
+    .field-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .field-wrap {
+      position: relative;
+      width: min(100%, 1000px);
+      min-height: 0;
+      border-radius: 28px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, var(--field) 0 7.14%, var(--field-dark) 7.14% 14.28%, var(--field) 14.28% 21.42%, var(--field-dark) 21.42% 28.56%, var(--field) 28.56% 35.7%, var(--field-dark) 35.7% 42.84%, var(--field) 42.84% 49.98%, var(--field-dark) 49.98% 57.12%, var(--field) 57.12% 64.26%, var(--field-dark) 64.26% 71.4%, var(--field) 71.4% 78.54%, var(--field-dark) 78.54% 85.68%, var(--field) 85.68% 92.82%, var(--field-dark) 92.82% 100%);
+      border: 4px solid #f5f1e7;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+      margin: 0 auto;
+    }
+
+    .current-log-card {
+      width: min(100%, 1000px);
+      margin: 10px auto 0;
+      border-radius: 18px;
+      padding: 14px 16px;
+      border: 1px solid #c8bea8;
+      transition: background-color 220ms ease, border-color 220ms ease;
+    }
+
+    .current-log-card.home {
+      background: #f1d8c7;
+      border-color: #d79f7b;
+    }
+
+    .current-log-card.away {
+      background: #d7e5eb;
+      border-color: #8eafb9;
+    }
+
+    .current-log-title {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .current-log-text {
+      line-height: 1.55;
+    }
+
+    .pitch-line,
+    .pitch-circle,
+    .pitch-box,
+    .pitch-goal,
+    .pitch-grid,
+    .cell-label {
+      position: absolute;
+    }
+
+    .pitch-line.mid {
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      background: rgba(255,255,255,0.8);
+      transform: translateX(-50%);
+    }
+
+    .pitch-circle {
+      left: 50%;
+      top: 50%;
+      width: 20%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.8);
+      transform: translate(-50%, -50%);
+    }
+
+    .pitch-box {
+      top: 18%;
+      height: 64%;
+      border: 2px solid rgba(255,255,255,0.8);
+    }
+
+    .pitch-box.top {
+      left: 0;
+      width: 16%;
+      border-left: 0;
+    }
+
+    .pitch-box.bottom {
+      right: 0;
+      width: 16%;
+      border-right: 0;
+    }
+
+    .pitch-box.top.small,
+    .pitch-box.bottom.small {
+      top: 30%;
+      height: 40%;
+      width: 7%;
+    }
+
+    .pitch-goal {
+      top: 38%;
+      height: 24%;
+      width: 2%;
+      border: 2px solid rgba(255,255,255,0.85);
+    }
+
+    .pitch-goal.top {
+      left: 0;
+      border-left: 0;
+    }
+
+    .pitch-goal.bottom {
+      right: 0;
+      border-right: 0;
+    }
+
+    .pitch-grid {
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.14) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.18) 1px, transparent 1px);
+      background-size: calc(100% / 14) 100%, 100% 25%;
+    }
+
+    .cell-label {
+      font: 12px/1.2 "Source Code Pro", monospace;
+      color: rgba(255,255,255,0.82);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+      pointer-events: none;
+    }
+
+    .trail-layer,
+    .marker-layer {
+      position: absolute;
+      inset: 0;
+    }
+
+    .pass-line {
+      position: absolute;
+      height: 5px;
+      transform-origin: left center;
+      border-radius: 999px;
+      box-shadow: 0 0 14px rgba(255,255,255,0.22);
+      opacity: 0.9;
+      z-index: 8;
+      --pass-angle: 0deg;
+      transform: translateY(-50%) rotate(var(--pass-angle)) scaleX(1);
+      animation: pass-line-grow 320ms cubic-bezier(.22,1,.36,1) both;
+    }
+
+    .pass-line.success {
+      background: linear-gradient(90deg, rgba(73, 180, 91, 0.95), rgba(73, 180, 91, 0.3));
+    }
+
+    .pass-line.fail {
+      background: linear-gradient(90deg, rgba(208, 64, 64, 0.95), rgba(208, 64, 64, 0.3));
+    }
+
+    .player-marker {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition:
+        left 420ms cubic-bezier(.22,1,.36,1),
+        top 420ms cubic-bezier(.22,1,.36,1),
+        transform 220ms ease,
+        opacity 220ms ease;
+      display: grid;
+      place-items: center;
+      font: 700 12px/1 "Source Code Pro", monospace;
+      color: #fff;
+      border: 2px solid rgba(255,255,255,0.88);
+      box-shadow:
+        0 10px 20px rgba(0,0,0,0.18),
+        0 0 0 8px rgba(255,255,255,0.07);
+      --marker-opacity: 1;
+      opacity: var(--marker-opacity);
+    }
+
+    .player-marker.entering {
+      animation: marker-fade-in 260ms ease;
+    }
+
+    .player-marker.leaving {
+      animation: marker-fade-out 220ms ease forwards;
+      pointer-events: none;
+    }
+
+    .player-marker.home {
+      background: radial-gradient(circle at 35% 30%, #ffb066, var(--home));
+    }
+
+    .player-marker.away {
+      background: radial-gradient(circle at 35% 30%, #62c0c7, var(--away));
+    }
+
+    .player-marker.active {
+      transform: translate(-50%, -50%) scale(1.12);
+    }
+
+    .player-marker::after {
+      content: "";
+      position: absolute;
+      inset: -7px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.22);
+      animation: pulse 1.8s infinite;
+    }
+
+    .player-marker.dim::after {
+      display: none;
+    }
+
+    .player-marker.next-step {
+      --marker-opacity: 0.48;
+      filter: saturate(0.78);
+    }
+
+    .player-tag {
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 7px);
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font: 12px/1.2 "Source Code Pro", monospace;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+    }
+
+
+    .team-home {
+      color: var(--home);
+    }
+
+    .team-away {
+      color: var(--away);
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 64px 96px 64px 96px auto 96px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .timeline input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .timeline-label {
+      color: var(--muted);
+      font-size: 14px;
+      padding-right: 12px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .side-panel {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+      align-content: start;
+      overflow: visible;
+    }
+
+    .details-row {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .card-title {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    .event-card {
+      background: #f7f0e3;
+      border: 1px solid #d7c2a1;
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .event-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .event-main strong {
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 72px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font: 700 12px/1 "Source Code Pro", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #fff;
+      background: var(--accent-2);
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 110px minmax(0, 1fr);
+      gap: 8px 12px;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    .kv dt {
+      color: var(--muted);
+    }
+
+    .kv dd {
+      margin: 0;
+      word-break: break-word;
+    }
+
+    .cue {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(109, 101, 89, 0.35);
+      line-height: 1.5;
+    }
+
+    .event-list {
+      max-height: 420px;
+      overflow: auto;
+      display: grid;
+      gap: 8px;
+    }
+
+    .event-item {
+      text-align: left;
+      border-radius: 14px;
+      padding: 12px 13px;
+      border: 1px solid #c8d6cf;
+      background: #edf2ef;
+      color: inherit;
+    }
+
+    .event-item.active {
+      background: #f0dfca;
+      border-color: #d8ab78;
+    }
+
+    .event-item small {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .event-item strong {
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .status {
+      margin-top: 12px;
+      min-height: 24px;
+      color: var(--accent-2);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.92); opacity: 0.5; }
+      70% { transform: scale(1.2); opacity: 0; }
+      100% { transform: scale(1.2); opacity: 0; }
+    }
+
+    @keyframes marker-fade-in {
+      0% { opacity: 0; }
+      100% { opacity: var(--marker-opacity); }
+    }
+
+    @keyframes marker-fade-out {
+      0% { opacity: var(--marker-opacity); }
+      100% { opacity: 0; }
+    }
+
+    @keyframes pass-line-grow {
+      0% {
+        transform: translateY(-50%) rotate(var(--pass-angle)) scaleX(0);
+      }
+      100% {
+        transform: translateY(-50%) rotate(var(--pass-angle)) scaleX(1);
+      }
+    }
+
+    @media (max-width: 1120px) {
+      .viewer {
+        min-height: 100svh;
+        padding: 12px;
+      }
+
+      .side-panel {
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .landing {
+        padding: 12px;
+      }
+
+      .landing-card {
+        padding: 18px;
+      }
+
+      .controls,
+      .timeline {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline-label {
+        text-align: left;
+      }
+
+      .kv {
+        grid-template-columns: 1fr;
+      }
+
+      .event-main {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .viewer {
+        padding: 8px;
+      }
+
+      .details-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="landing">
+      <div class="landing-card">
+        <h1>Просмотрщик матчей Footter</h1>
+        <p>Для просмотра визуализации матча вставьте ссылку на матч.</p>
+        <div class="panel" style="margin-top:18px;">
+          <div class="controls">
+            <input id="urlInput" type="url" placeholder="https://footter.com/match/305458/" value="https://footter.com/match/305458/">
+            <button id="loadButton" type="button">Открыть матч</button>
+          </div>
+          <div class="source-grid hidden" hidden style="display:none;">
+            <div>
+              <p>Локальный HTML матча или сохранённый HTML с логом</p>
+              <input id="pageFileInput" type="file" accept=".html,text/html">
+            </div>
+          </div>
+          <div id="status" class="status"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="app-shell">
+      <div class="viewer">
+        <div class="field-panel">
+          <section class="panel" style="margin-bottom:10px;width:100%;">
+            <div class="meta" style="width:100%;">
+              <div class="meta-card" style="width:100%;">
+                <div class="match-bar">
+                  <span id="teamsLabel">-</span>
+                  <span id="matchMinute" class="match-minute">-</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="timeline" style="margin-top:12px;">
+              <button id="prevButton" class="ghost" type="button" disabled>&larr;</button>
+              <button id="playButton" class="secondary" type="button" disabled>Play</button>
+              <button id="nextButton" class="ghost" type="button" disabled>&rarr;</button>
+              <select id="speedSelect" aria-label="Скорость">
+                <option value="6000">x0.5</option>
+                <option value="4000">x0.75</option>
+                <option value="3000" selected>x1</option>
+                <option value="2000">x1.5</option>
+                <option value="1000">x3</option>
+              </select>
+              <input id="timelineRange" type="range" min="0" max="0" value="0" disabled>
+              <div class="timeline-label" id="timelineLabel">0 / 0</div>
+            </div>
+          </section>
+
+          <div class="field-wrap" id="field">
+            <div class="pitch-grid"></div>
+            <div class="pitch-line mid"></div>
+            <div class="pitch-circle"></div>
+            <div class="pitch-box top"></div>
+            <div class="pitch-box top small"></div>
+            <div class="pitch-box bottom"></div>
+            <div class="pitch-box bottom small"></div>
+            <div class="trail-layer" id="trailLayer"></div>
+            <div class="marker-layer" id="markerLayer"></div>
+          </div>
+        </div>
+
+        <div class="side-panel">
+          <div class="details-row">
+            <section id="currentLogCard" class="current-log-card">
+              <div id="currentLogText" class="current-log-text">После загрузки здесь появится текст текущего события.</div>
+            </section>
+
+            <section class="event-card">
+              <h2 class="card-title">Текущий эпизод</h2>
+              <div class="event-main">
+                <div>
+                  <small id="eventClock">Минута -</small>
+                  <strong id="eventAction">Нет данных</strong>
+                </div>
+                <span class="pill" id="eventResult">-</span>
+              </div>
+              <dl class="kv">
+                <dt>Команда</dt>
+                <dd id="eventTeam">-</dd>
+                <dt>С мячом</dt>
+                <dd id="eventBallPlayer">-</dd>
+                <dt>Цель</dt>
+                <dd id="eventTarget">-</dd>
+                <dt>Соперник</dt>
+                <dd id="eventOpponent">-</dd>
+                <dt>Координаты</dt>
+                <dd id="eventCoords">-</dd>
+              </dl>
+            </section>
+          </div>
+
+          <section class="event-card">
+            <h2 class="card-title">Лента событий</h2>
+            <div class="event-list" id="eventList"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const FIELD_ROWS = 14;
+    const FIELD_COLS = 4;
+    const TEAM_COLORS = ["home", "away"];
+    const START_COORD_FALLBACK = [8, 2];
+    const KICKOFF_POINT = [7.5, 2.5];
+
+    const divhistKeyMap = {
+      "игрок_с_мячом": "player_with_ball",
+      "команда": "team",
+      "минута": "time",
+      "итерация": "step",
+      "действие": "action",
+      "принимающий": "target",
+      "коорд": "position",
+      "результат": "result",
+      "соперник": "opponent"
+    };
+
+    const urlInput = document.getElementById("urlInput");
+    const loadButton = document.getElementById("loadButton");
+    const pageFileInput = document.getElementById("pageFileInput");
+    const playButton = document.getElementById("playButton");
+    const prevButton = document.getElementById("prevButton");
+    const nextButton = document.getElementById("nextButton");
+    const speedSelect = document.getElementById("speedSelect");
+    const timelineRange = document.getElementById("timelineRange");
+    const timelineLabel = document.getElementById("timelineLabel");
+    const teamsLabel = document.getElementById("teamsLabel");
+    const matchMinute = document.getElementById("matchMinute");
+    const fieldPanel = document.querySelector(".field-panel");
+    const field = document.getElementById("field");
+    const currentLogCard = document.getElementById("currentLogCard");
+    const currentLogText = document.getElementById("currentLogText");
+    const trailLayer = document.getElementById("trailLayer");
+    const markerLayer = document.getElementById("markerLayer");
+    const eventList = document.getElementById("eventList");
+    const eventClock = document.getElementById("eventClock");
+    const eventAction = document.getElementById("eventAction");
+    const eventResult = document.getElementById("eventResult");
+    const eventTeam = document.getElementById("eventTeam");
+    const eventBallPlayer = document.getElementById("eventBallPlayer");
+    const eventTarget = document.getElementById("eventTarget");
+    const eventOpponent = document.getElementById("eventOpponent");
+    const eventCoords = document.getElementById("eventCoords");
+    const statusNode = document.getElementById("status");
+
+    const state = {
+      events: [],
+      text: "",
+      teams: [],
+      score: [0, 0],
+      teamByPlayerId: {},
+      snapshots: [],
+      currentIndex: 0,
+      timer: null,
+      markerNodes: {}
+    };
+
+    let fieldResizeObserver = null;
+
+    function setStatus(message, isError) {
+      statusNode.textContent = message;
+      statusNode.className = isError ? "status error" : "status";
+    }
+
+    function normalizeText(value) {
+      return (value || "")
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    }
+
+    function toAbsoluteUrl(path, baseUrl) {
+      try {
+        return new URL(path, baseUrl).href;
+      } catch {
+        return path;
+      }
+    }
+
+    function slugifyKey(value, fallback) {
+      const slug = normalizeText(value)
+        .toLowerCase()
+        .replace(/[^a-zа-яё0-9]+/gi, "_")
+        .replace(/^_+|_+$/g, "");
+      return slug || fallback;
+    }
+
+    function splitDivhistLines(element) {
+      const rows = [];
+      let current = [];
+
+      for (const node of Array.from(element.childNodes)) {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === "br") {
+          rows.push(normalizeText(current.join(" ")));
+          current = [];
+          continue;
+        }
+
+        const text = normalizeText(node.textContent || "");
+        if (text) {
+          current.push(text);
+        }
+      }
+
+      const tail = normalizeText(current.join(" "));
+      if (tail) {
+        rows.push(tail);
+      }
+
+      return rows.filter(Boolean);
+    }
+
+    function parsePlayerValue(raw) {
+      const value = normalizeText(raw);
+      if (!value) {
+        return null;
+      }
+
+      const match = value.match(/^(\d+)\s+(.+)$/);
+      if (!match) {
+        return { id: null, name: value, label: value };
+      }
+
+      return {
+        id: match[1],
+        name: match[2],
+        label: value
+      };
+    }
+
+    function parsePositionValue(raw) {
+      const value = normalizeText(raw);
+      if (!value) {
+        return [];
+      }
+
+      try {
+        const parsed = JSON.parse(value.replace(/\(/g, "[").replace(/\)/g, "]"));
+        if (Array.isArray(parsed)) {
+          return parsed.filter(Array.isArray).map((pair) => pair.map((item) => Number(item)));
+        }
+      } catch {
+      }
+
+      const matches = [...value.matchAll(/\[(\d+)\s*,\s*(\d+)\]/g)];
+      return matches.map((match) => [Number(match[1]), Number(match[2])]);
+    }
+
+    function coerceValue(key, raw) {
+      const value = normalizeText(raw);
+      if (!value) {
+        return "";
+      }
+
+      if (key === "time" || key === "step") {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : value;
+      }
+
+      if (key === "position") {
+        return parsePositionValue(value);
+      }
+
+      if (key === "result") {
+        if (value === "True") return true;
+        if (value === "False") return false;
+        if (/^-?\d+(\.\d+)?$/.test(value)) {
+          return Number(value);
+        }
+      }
+
+      return value;
+    }
+
+    function divhistToEvent(element, index) {
+      const event = {
+        index,
+        raw_text: normalizeText(element.textContent)
+      };
+
+      splitDivhistLines(element).forEach((line, lineIndex) => {
+        const match = line.match(/^\s*([^:—]+?)\s*[:—]\s*(.+)\s*$/);
+        if (!match) {
+          event[`line_${lineIndex + 1}`] = line;
+          return;
+        }
+
+        const rawKey = normalizeText(match[1]);
+        const rawValue = normalizeText(match[2]);
+        let key = slugifyKey(rawKey, `line_${lineIndex + 1}`);
+        key = divhistKeyMap[key] || key;
+
+        if (key === "prev_pass") {
+          return;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(event, key)) {
+          key = `${key}_${lineIndex + 1}`;
+        }
+
+        event[key] = coerceValue(key, rawValue);
+      });
+
+      return event;
+    }
+
+    function extractMatchLogUrl(doc, pageUrl) {
+      const fullLog = doc.querySelector("#full_log");
+      if (fullLog && normalizeText(fullLog.textContent)) {
+        return pageUrl;
+      }
+
+      const scriptText = Array.from(doc.scripts).map((script) => script.textContent || "").join("\n");
+      const fromScript = scriptText.match(/['"](?<path>\/match_log\/\d+\/?)['"]/i);
+      if (fromScript && fromScript.groups && fromScript.groups.path) {
+        return toAbsoluteUrl(fromScript.groups.path, pageUrl);
+      }
+
+      const fromMatchUrl = pageUrl.match(/\/match\/(\d+)\/?/i);
+      if (fromMatchUrl) {
+        return toAbsoluteUrl(`/match_log/${fromMatchUrl[1]}/`, pageUrl);
+      }
+
+      const directMatchLog = pageUrl.match(/\/match_log\/\d+\/?/i);
+      return directMatchLog ? pageUrl : null;
+    }
+
+    async function fetchText(url) {
+      const response = await fetch(url, { credentials: "omit" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.text();
+    }
+
+    async function fetchWithFallbacks(url) {
+      const candidates = [
+        { label: "direct", url },
+        { label: "allorigins", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
+        { label: "corsproxy", url: `https://corsproxy.io/?${encodeURIComponent(url)}` }
+      ];
+
+      const errors = [];
+      for (const candidate of candidates) {
+        try {
+          const text = await fetchText(candidate.url);
+          return { text, resolvedVia: candidate.label };
+        } catch (error) {
+          errors.push(`${candidate.label}: ${error.message}`);
+        }
+      }
+
+      throw new Error(`Не удалось загрузить страницу. ${errors.join(" | ")}`);
+    }
+
+    function parseHtml(html) {
+      return new DOMParser().parseFromString(html, "text/html");
+    }
+
+    async function readFileText(file) {
+      if (!file) {
+        return "";
+      }
+      return file.text();
+    }
+
+    function renderFullLog(fullLog) {
+      const divhistNodes = Array.from(fullLog.querySelectorAll(".divhist, div[id*='divhist'], div[class*='divhist']"));
+      const events = divhistNodes.map(divhistToEvent);
+      const text = normalizeText(fullLog.textContent);
+      return { events, text };
+    }
+
+    function getLocalSourceLabel(file) {
+      return file ? `Локальный файл: ${file.name}` : "-";
+    }
+
+    function getInitialSourceLabel(pageUrl, pageFile) {
+      if (pageUrl) {
+        return pageUrl;
+      }
+      if (pageFile) {
+        return getLocalSourceLabel(pageFile);
+      }
+      return "-";
+    }
+
+    function getUniqueTeams(events) {
+      return Array.from(new Set(events.map((event) => normalizeText(event.team)).filter(Boolean))).slice(0, 2);
+    }
+
+    function extractTeamsFromMatchDoc(doc, events) {
+      if (!doc) {
+        return getUniqueTeams(events);
+      }
+
+      const leftNode = doc.querySelector("#team_left");
+      const rightNode = doc.querySelector("#team_rigth, #team_right");
+      const leftText = normalizeText(leftNode ? leftNode.textContent : "");
+      const rightText = normalizeText(rightNode ? rightNode.textContent : "");
+
+      if (leftText && rightText) {
+        return [leftText, rightText];
+      }
+
+      const scriptText = Array.from(doc.scripts).map((script) => script.textContent || "").join("\n");
+      const leftMatch = scriptText.match(/\$\("#team_left"\)\.html\("([^"]+)"\)/);
+      const rightMatch = scriptText.match(/\$\("#team_rigth"\)\.html\("([^"]+)"\)|\$\("#team_right"\)\.html\("([^"]+)"\)/);
+      const leftFromScript = normalizeText(leftMatch ? leftMatch[1] : "");
+      const rightFromScript = normalizeText(rightMatch ? (rightMatch[1] || rightMatch[2] || "") : "");
+
+      if (leftFromScript && rightFromScript) {
+        return [leftFromScript, rightFromScript];
+      }
+
+      return getUniqueTeams(events);
+    }
+
+    function inferTeamByPlayer(events, teams) {
+      const map = {};
+
+      function assign(player, team) {
+        if (!player || !player.id || !team || map[player.id]) {
+          return;
+        }
+        map[player.id] = team;
+      }
+
+      function otherTeam(team) {
+        return teams.find((item) => item !== team) || team;
+      }
+
+      events.forEach((event) => {
+        const actor = parsePlayerValue(event.player_with_ball);
+        const target = parsePlayerValue(event.target);
+        const opponent = parsePlayerValue(event.opponent);
+        const team = normalizeText(event.team);
+
+        assign(actor, team);
+        assign(target, team);
+        assign(opponent, otherTeam(team));
+      });
+
+      return map;
+    }
+
+    function normalizeActionLabel(action) {
+      const map = {
+        "short_pass": "Короткий пас",
+        "medium_pass": "Средний пас",
+        "long_pass": "Длинный пас",
+        "naves": "Навес",
+        "corner_pass": "Угловой",
+        "dribling": "Дриблинг",
+        "pass": "Пас",
+        "удар": "Удар",
+        "medium_shot": "Средний удар",
+        "long_shot": "Дальний удар",
+        "нарушение": "Нарушение",
+        "розыгрыш": "Розыгрыш"
+      };
+      return map[action] || action || "Эпизод";
+    }
+
+    function getResultLabel(value) {
+      if (value === true) return "Успех";
+      if (value === false) return "Провал";
+      if (value === "" || value === undefined) return "-";
+      return String(value);
+    }
+
+    function makeDisplayName(player) {
+      return player ? player.name : "-";
+    }
+
+    function clampCoord(row, col) {
+      const rawRow = Number(row);
+      const rawCol = Number(col);
+      const safeRow = Math.max(1, Math.min(FIELD_ROWS, Number.isFinite(rawRow) ? rawRow : START_COORD_FALLBACK[0]));
+      const safeCol = Math.max(1, Math.min(FIELD_COLS, Number.isFinite(rawCol) ? rawCol : START_COORD_FALLBACK[1]));
+      return [safeRow, safeCol];
+    }
+
+    function getCoordsPair(event) {
+      const coords = Array.isArray(event.position) ? event.position : [];
+      if (coords.length >= 2) {
+        return {
+          from: clampCoord(coords[0][0], coords[0][1]),
+          to: clampCoord(coords[1][0], coords[1][1])
+        };
+      }
+
+      if (coords.length === 1) {
+        const point = clampCoord(coords[0][0], coords[0][1]);
+        return { from: point, to: point };
+      }
+
+      return { from: null, to: null };
+    }
+
+    function getEventPoint(event) {
+      const coords = Array.isArray(event.position) ? event.position : [];
+      if (coords.length === 0) {
+        return null;
+      }
+
+      return clampCoord(coords[0][0], coords[0][1]);
+    }
+
+    function toGlobalCoord(coord, teamName, teams) {
+      if (!coord) {
+        return null;
+      }
+
+      return clampCoord(coord[0], coord[1]);
+    }
+
+    function makePlayerState(player, team, row, col, role, index, fallbackColor) {
+      return {
+        id: player ? player.id : `${role}_${index}`,
+        name: player ? player.name : role,
+        team: team || fallbackColor,
+        row,
+        col,
+        role,
+        active: true
+      };
+    }
+
+    function buildSnapshots(events, teams, teamByPlayerId) {
+      const snapshots = [];
+
+      const defaultTeams = {
+        home: teams[0] || "Команда 1",
+        away: teams[1] || "Команда 2"
+      };
+
+      for (let index = 0; index < events.length; index++) {
+        const event = events[index];
+        const actor = parsePlayerValue(event.player_with_ball);
+        const target = parsePlayerValue(event.target);
+        const opponent = parsePlayerValue(event.opponent);
+        const framePlayers = {};
+        const team = normalizeText(event.team);
+        const actorTeam = actor && actor.id && teamByPlayerId[actor.id] ? teamByPlayerId[actor.id] : team;
+        const action = String(event.action || "").toLowerCase();
+        const isKickoff = action === "розыгрыш";
+        const localPoint = getEventPoint(event);
+        const currentPoint = isKickoff
+          ? KICKOFF_POINT
+          : (toGlobalCoord(localPoint, team, teams) || START_COORD_FALLBACK);
+
+        if (actor) {
+          framePlayers[actor.id || `actor_${event.index}`] = makePlayerState(actor, actorTeam, currentPoint[0], currentPoint[1], "ball", event.index, defaultTeams.home);
+        }
+
+        snapshots.push({
+          event,
+          players: framePlayers,
+          focusPoint: currentPoint
+        });
+      }
+
+      return snapshots;
+    }
+
+    function getTeamSide(teamName) {
+      const index = state.teams.indexOf(teamName);
+      return TEAM_COLORS[index] || "home";
+    }
+
+    function formatTeamName(teamName) {
+      const side = getTeamSide(teamName);
+      const className = side === "away" ? "team-away" : "team-home";
+      return `<span class="${className}">${teamName || "-"}</span>`;
+    }
+
+    function coordToPercent(row, col) {
+      const [safeRow, safeCol] = clampCoord(row, col);
+      return {
+        x: ((safeRow - 0.5) / FIELD_ROWS) * 100,
+        y: ((FIELD_COLS - safeCol) + 0.5) / FIELD_COLS * 100
+      };
+    }
+
+    function createFieldLabels() {
+      Array.from(field.querySelectorAll(".cell-label")).forEach((node) => node.remove());
+
+      for (let row = 1; row <= FIELD_ROWS; row++) {
+        const label = document.createElement("div");
+        label.className = "cell-label";
+        const pos = coordToPercent(row, 1);
+        label.textContent = String(row);
+        label.style.left = `${pos.x}%`;
+        label.style.bottom = "10px";
+        label.style.transform = "translateX(-50%)";
+        field.appendChild(label);
+      }
+
+      for (let col = 1; col <= FIELD_COLS; col++) {
+        const label = document.createElement("div");
+        label.className = "cell-label";
+        const pos = coordToPercent(1, col);
+        label.textContent = String(col);
+        label.style.left = "12px";
+        label.style.top = `${pos.y}%`;
+        label.style.transform = "translateY(-50%)";
+        field.appendChild(label);
+      }
+    }
+
+    function resizeField() {
+      if (!fieldPanel || !field) {
+        return;
+      }
+
+      const panelRect = fieldPanel.getBoundingClientRect();
+      const availableWidth = Math.max(260, Math.min(panelRect.width, 1000));
+      const nextWidth = availableWidth;
+      const nextHeight = nextWidth * (4 / 7);
+
+      field.style.width = `${nextWidth}px`;
+      field.style.height = `${nextHeight}px`;
+    }
+
+    function refreshFieldLayout() {
+      resizeField();
+      createFieldLabels();
+    }
+
+    function scheduleFieldLayoutRefresh() {
+      requestAnimationFrame(() => {
+        refreshFieldLayout();
+        requestAnimationFrame(() => {
+          refreshFieldLayout();
+        });
+      });
+    }
+
+    function isPassAction(action) {
+      return action === "pass"
+        || action === "short_pass"
+        || action === "long_pass"
+        || action === "naves"
+        || action === "пас"
+        || action === "короткий пас"
+        || action === "длинный пас"
+        || action === "навес";
+    }
+
+    function isShotAction(action) {
+      return action === "удар"
+        || action === "medium_shot"
+        || action === "long_shot"
+        || action === "средний удар"
+        || action === "дальний удар";
+    }
+
+    function isSubstitutionAction(action) {
+      return action === "замена";
+    }
+
+    function getNextRenderableSnapshot(startIndex) {
+      for (let index = startIndex + 1; index < state.snapshots.length; index++) {
+        const snapshot = state.snapshots[index];
+        const action = String((snapshot && snapshot.event && snapshot.event.action) || "").toLowerCase();
+        if (!isSubstitutionAction(action)) {
+          return snapshot;
+        }
+      }
+      return null;
+    }
+
+    function buildScore(events, teams) {
+      const score = [0, 0];
+      const home = normalizeText(teams[0]);
+      const away = normalizeText(teams[1]);
+
+      events.forEach((event) => {
+        const action = String(event.action || "").toLowerCase();
+        const team = normalizeText(event.team);
+        const isGoal = isShotAction(action) && (
+          event.result === 1
+          || event.result === true
+          || event.result === "1"
+        );
+
+        if (!isGoal) {
+          return;
+        }
+
+        if (team === home) {
+          score[0] += 1;
+        } else if (team === away) {
+          score[1] += 1;
+        }
+      });
+
+      return score;
+    }
+
+    function buildScoreUntilIndex(events, teams, endExclusive) {
+      return buildScore(events.slice(0, Math.max(0, endExclusive)), teams);
+    }
+
+    function renderActionLine(currentSnapshot, nextSnapshot) {
+      trailLayer.innerHTML = "";
+      if (!currentSnapshot) {
+        return;
+      }
+
+      const action = String((currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
+      if (!isPassAction(action) && !isShotAction(action)) {
+        return;
+      }
+
+      const fromPoint = currentSnapshot.focusPoint;
+      if (!fromPoint) {
+        return;
+      }
+
+      const from = coordToPercent(fromPoint[0], fromPoint[1]);
+      const fieldRect = field.getBoundingClientRect();
+      const fromX = (from.x / 100) * fieldRect.width;
+      const fromY = (from.y / 100) * fieldRect.height;
+      let toX = fromX;
+      let toY = fromY;
+
+      if (isPassAction(action)) {
+        if (!nextSnapshot || !nextSnapshot.focusPoint) {
+          return;
+        }
+        const to = coordToPercent(nextSnapshot.focusPoint[0], nextSnapshot.focusPoint[1]);
+        toX = (to.x / 100) * fieldRect.width;
+        toY = (to.y / 100) * fieldRect.height;
+      } else if (isShotAction(action)) {
+        const teamName = normalizeText(currentSnapshot.event.team);
+        const isAway = getTeamSide(teamName) === "away";
+        toX = isAway ? 0 : fieldRect.width;
+        toY = fieldRect.height / 2;
+      }
+
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      const isFailed = isPassAction(action)
+        ? (
+          currentSnapshot.event.result === 0
+          || currentSnapshot.event.result === 7
+          || currentSnapshot.event.result === false
+          || currentSnapshot.event.result === "0"
+          || currentSnapshot.event.result === "7"
+        )
+        : !(
+          currentSnapshot.event.result === 1
+          || currentSnapshot.event.result === true
+          || currentSnapshot.event.result === "1"
+        );
+
+      const line = document.createElement("div");
+      line.className = `pass-line ${isFailed ? "fail" : "success"}`;
+      line.style.left = `${fromX}px`;
+      line.style.top = `${fromY}px`;
+      line.style.width = `${length}px`;
+      line.style.setProperty("--pass-angle", `${angle}deg`);
+      trailLayer.appendChild(line);
+    }
+
+    function renderMarkers(currentSnapshot, nextSnapshot) {
+      if (!currentSnapshot && !nextSnapshot) {
+        trailLayer.innerHTML = "";
+        markerLayer.innerHTML = "";
+        state.markerNodes = {};
+        return;
+      }
+
+      const entries = [];
+      const stackMap = new Map();
+
+      if (currentSnapshot) {
+        Object.values(currentSnapshot.players).forEach((player) => {
+          entries.push({
+            ...player,
+            markerId: `current:${player.id}`,
+            markerPhase: "current"
+          });
+        });
+      }
+
+      if (nextSnapshot) {
+        Object.values(nextSnapshot.players).forEach((player) => {
+          entries.push({
+            ...player,
+            markerId: `next:${player.id}`,
+            markerPhase: "next"
+          });
+        });
+      }
+
+      const nextIds = new Set(entries.map((player) => player.markerId));
+
+      entries.forEach((player) => {
+        const key = `${player.row}:${player.col}`;
+        if (!stackMap.has(key)) {
+          stackMap.set(key, []);
+        }
+        stackMap.get(key).push(player);
+      });
+
+      const reusableIds = new Set();
+      entries.forEach((player) => {
+        if (player.markerPhase === "current") {
+          const previousNextId = `next:${player.id}`;
+          if (state.markerNodes[previousNextId]) {
+            reusableIds.add(previousNextId);
+          }
+        }
+      });
+
+      Object.keys(state.markerNodes).forEach((playerId) => {
+        if (!nextIds.has(playerId) && !reusableIds.has(playerId)) {
+          const marker = state.markerNodes[playerId];
+          if (!marker.classList.contains("leaving")) {
+            marker.classList.add("leaving");
+            marker.addEventListener("animationend", () => {
+              if (state.markerNodes[playerId] === marker) {
+                marker.remove();
+                delete state.markerNodes[playerId];
+              }
+            }, { once: true });
+          }
+        }
+      });
+
+      entries.forEach((player) => {
+        const playerId = player.markerId;
+        let marker = state.markerNodes[playerId];
+        let isNewMarker = false;
+        if (!marker) {
+          if (player.markerPhase === "current" && state.markerNodes[`next:${player.id}`]) {
+            marker = state.markerNodes[`next:${player.id}`];
+            delete state.markerNodes[`next:${player.id}`];
+            state.markerNodes[playerId] = marker;
+          } else {
+            marker = document.createElement("div");
+            state.markerNodes[playerId] = marker;
+            markerLayer.appendChild(marker);
+            isNewMarker = true;
+          }
+        }
+
+        const side = getTeamSide(player.team);
+        const pos = coordToPercent(player.row, player.col);
+        const stack = stackMap.get(`${player.row}:${player.col}`) || [player];
+        const stackIndex = stack.findIndex((item) => item.markerId === playerId);
+        const verticalOffset = (stackIndex - ((stack.length - 1) / 2)) * 50;
+        const initials = player.name.split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").slice(0, 2).toUpperCase();
+
+        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""}`;
+        marker.style.left = `${pos.x}%`;
+        marker.style.top = `calc(${pos.y}% + ${verticalOffset}px)`;
+        marker.style.zIndex = player.markerPhase === "next" ? "10" : "15";
+        marker.innerHTML = `
+          <span>${initials || "P"}</span>
+          <span class="player-tag">${player.name}</span>
+        `;
+
+        if (isNewMarker) {
+          marker.classList.add("entering");
+          marker.addEventListener("animationend", () => {
+            marker.classList.remove("entering");
+          }, { once: true });
+        }
+      });
+    }
+
+    function sanitizeEventHtml(rawHtml) {
+      const html = rawHtml || "";
+      const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+      const root = doc.body.firstElementChild;
+
+      if (!root) {
+        return "Описание отсутствует.";
+      }
+
+      doc.querySelectorAll("script, style, iframe, object, embed").forEach((node) => node.remove());
+      doc.querySelectorAll("*").forEach((node) => {
+        Array.from(node.attributes).forEach((attr) => {
+          const name = attr.name.toLowerCase();
+          if (name.startsWith("on")) {
+            node.removeAttribute(attr.name);
+          }
+        });
+
+        if (node.tagName.toLowerCase() === "a") {
+          const href = node.getAttribute("href") || "";
+          if (href.startsWith("/")) {
+            node.setAttribute("href", `https://footter.com${href}`);
+          }
+          node.setAttribute("target", "_blank");
+          node.setAttribute("rel", "noopener noreferrer");
+        }
+      });
+
+      return root.innerHTML || "Описание отсутствует.";
+    }
+
+    function renderEventCard(snapshot) {
+      if (!snapshot) {
+        eventClock.textContent = "Минута -";
+        eventAction.textContent = "Нет данных";
+        eventResult.textContent = "-";
+        eventTeam.innerHTML = "-";
+        eventBallPlayer.textContent = "-";
+        eventTarget.textContent = "-";
+        eventOpponent.textContent = "-";
+        eventCoords.textContent = "-";
+        currentLogCard.className = "current-log-card";
+        currentLogText.innerHTML = "После загрузки здесь появится текст текущего события.";
+        return;
+      }
+
+      const event = snapshot.event;
+      const teamSide = getTeamSide(event.team || "");
+      eventClock.textContent = `Минута ${event.time ?? "-"} • Итерация ${event.step ?? "-"}`;
+      eventAction.textContent = normalizeActionLabel(event.action);
+      eventResult.textContent = getResultLabel(event.result);
+      eventTeam.innerHTML = formatTeamName(event.team || "-");
+      eventBallPlayer.textContent = makeDisplayName(parsePlayerValue(event.player_with_ball));
+      eventTarget.textContent = makeDisplayName(parsePlayerValue(event.target));
+      eventOpponent.textContent = makeDisplayName(parsePlayerValue(event.opponent));
+      eventCoords.textContent = Array.isArray(event.position) && event.position.length
+        ? JSON.stringify(event.position)
+        : "-";
+      currentLogCard.className = `current-log-card ${teamSide}`;
+      currentLogText.innerHTML = sanitizeEventHtml(event.cue1 || event.raw_text || "Описание отсутствует.");
+    }
+
+    function renderEventList() {
+      eventList.innerHTML = "";
+      state.events.forEach((event, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `event-item ${index === state.currentIndex ? "active" : ""}`;
+        button.innerHTML = `
+          <small>${event.time ?? "-"} мин • шаг ${event.step ?? "-"}</small>
+          <strong>${normalizeActionLabel(event.action)}</strong>
+          <span>${sanitizeEventHtml(event.cue1 || event.team || "Без текста")}</span>
+        `;
+        button.addEventListener("click", () => {
+          stopPlayback();
+          setCurrentIndex(index);
+        });
+        eventList.appendChild(button);
+      });
+    }
+
+    function updateButtons() {
+      const hasEvents = state.events.length > 0;
+      const lastIndex = Math.max(0, state.events.length - 1);
+      playButton.disabled = !hasEvents;
+      prevButton.disabled = !hasEvents || state.currentIndex <= 0;
+      nextButton.disabled = !hasEvents || state.currentIndex >= lastIndex;
+      timelineRange.disabled = !hasEvents;
+    }
+
+    function setCurrentIndex(index) {
+      const lastIndex = Math.max(0, state.snapshots.length - 1);
+      state.currentIndex = Math.max(0, Math.min(lastIndex, index));
+      const currentSnapshot = state.snapshots[state.currentIndex] || null;
+      const nextSnapshot = getNextRenderableSnapshot(state.currentIndex);
+      state.score = buildScoreUntilIndex(state.events, state.teams, state.currentIndex + 1);
+      timelineRange.value = String(state.currentIndex);
+      timelineLabel.textContent = `${state.currentIndex + 1} / ${state.snapshots.length}`;
+      fillSummary();
+      renderActionLine(currentSnapshot, nextSnapshot);
+      renderMarkers(currentSnapshot, nextSnapshot);
+      renderEventCard(state.snapshots[state.currentIndex]);
+      renderEventList();
+      updateButtons();
+    }
+
+    function stopPlayback() {
+      if (state.timer) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+      playButton.textContent = "Play";
+    }
+
+    function schedulePlayback() {
+      stopPlayback();
+      if (state.currentIndex >= state.snapshots.length - 1) {
+        setCurrentIndex(0);
+      }
+      playButton.textContent = "Pause";
+
+      const tick = () => {
+        if (state.currentIndex >= state.snapshots.length - 1) {
+          stopPlayback();
+          return;
+        }
+
+        setCurrentIndex(state.currentIndex + 1);
+        state.timer = setTimeout(tick, Number(speedSelect.value));
+      };
+
+      state.timer = setTimeout(tick, Number(speedSelect.value));
+    }
+
+    function fillSummary() {
+      const home = state.teams[0] || "Команда 1";
+      const away = state.teams[1] || "Команда 2";
+      const scoreLabel = `${state.score[0] ?? 0}:${state.score[1] ?? 0}`;
+      const currentEvent = state.events[state.currentIndex];
+      const minuteLabel = currentEvent && currentEvent.time !== undefined ? `${currentEvent.time} мин` : "-";
+      teamsLabel.innerHTML = state.teams.length
+        ? `${formatTeamName(home)} <span style="color: var(--text); font-weight: 700;">${scoreLabel}</span> ${formatTeamName(away)}`
+        : "-";
+      matchMinute.textContent = minuteLabel;
+    }
+
+    function enableTimeline() {
+      const max = Math.max(0, state.events.length - 1);
+      timelineRange.max = String(max);
+      timelineRange.min = "0";
+      timelineRange.value = "0";
+    }
+
+    async function parseMatchPage() {
+      const pageUrl = urlInput.value.trim();
+      const pageFile = pageFileInput.files && pageFileInput.files[0] ? pageFileInput.files[0] : null;
+      if (!pageUrl) {
+        if (!pageFile) {
+          setStatus("Нужна ссылка или локальный HTML матча.", true);
+          return;
+        }
+      }
+
+      if (!pageUrl && !pageFile) {
+        setStatus("Нужен источник данных.", true);
+        return;
+      }
+
+      stopPlayback();
+      setStatus("Загрузка страницы...");
+      teamsLabel.innerHTML = "-";
+      matchMinute.textContent = "-";
+      timelineLabel.textContent = "0 / 0";
+      timelineRange.max = "0";
+      timelineRange.value = "0";
+      state.events = [];
+      state.snapshots = [];
+      state.teams = [];
+      state.score = [0, 0];
+      state.teamByPlayerId = {};
+      state.markerNodes = {};
+      renderMarkers(null);
+      renderEventCard(null);
+      renderEventList();
+      updateButtons();
+
+      try {
+        let pageDoc = null;
+        let logDoc = null;
+        let finalLogUrl = pageUrl || getLocalSourceLabel(pageFile);
+        let statusText = "";
+
+        if (pageFile) {
+          const pageHtml = await readFileText(pageFile);
+          pageDoc = parseHtml(pageHtml);
+          statusText = `Матч загружен из локального файла ${pageFile.name}.`;
+        } else if (pageUrl) {
+          const pageResult = await fetchWithFallbacks(pageUrl);
+          pageDoc = parseHtml(pageResult.text);
+          statusText = `Страница загружена через ${pageResult.resolvedVia}.`;
+        }
+
+        if (pageDoc) {
+          const fullLogOnPage = pageDoc.querySelector("#full_log");
+
+          if (fullLogOnPage && normalizeText(fullLogOnPage.textContent)) {
+            logDoc = pageDoc;
+            finalLogUrl = pageUrl || getLocalSourceLabel(pageFile);
+          } else {
+            const detectedLogUrl = pageUrl ? extractMatchLogUrl(pageDoc, pageUrl) : null;
+            if (!detectedLogUrl) {
+              throw new Error("В выбранном локальном HTML нет содержимого #full_log. Выберите HTML, где уже есть лог матча, или используйте ссылку.");
+            }
+
+            const logResult = await fetchWithFallbacks(detectedLogUrl);
+            logDoc = parseHtml(logResult.text);
+            finalLogUrl = detectedLogUrl;
+            statusText = `${statusText} Match log загружен через ${logResult.resolvedVia}.`.trim();
+          }
+        }
+
+        if (!logDoc) {
+          throw new Error("Не удалось получить HTML match_log.");
+        }
+
+        const fullLog = logDoc.querySelector("#full_log") || logDoc.body;
+        const rendered = renderFullLog(fullLog);
+        const events = rendered.events.filter((event) => event.action || event.cue1 || event.position);
+
+        state.events = events;
+        state.text = rendered.text;
+        state.teams = extractTeamsFromMatchDoc(pageDoc || logDoc, events);
+        state.score = buildScore(events, state.teams);
+        state.teamByPlayerId = inferTeamByPlayer(events, state.teams);
+        state.snapshots = buildSnapshots(events, state.teams, state.teamByPlayerId);
+
+        fillSummary();
+        enableTimeline();
+        document.body.classList.add("loaded");
+        scheduleFieldLayoutRefresh();
+
+        if (state.snapshots.length) {
+          setCurrentIndex(0);
+        } else {
+          renderEventCard(null);
+        }
+
+        setStatus(statusText);
+      } catch (error) {
+        const errorMessage = String(error && error.message ? error.message : error);
+        const corsHint = window.location.protocol === "file:"
+          ? " Страница открыта как file://, поэтому прямой fetch на footter блокируется браузером. Используйте локальный HTML с уже сохранённым логом или откройте страницу через локальный http-сервер."
+          : "";
+        setStatus(`${errorMessage}${corsHint}`, true);
+      }
+    }
+
+    loadButton.addEventListener("click", parseMatchPage);
+    urlInput.addEventListener("paste", () => {
+      setTimeout(() => {
+        if (urlInput.value.trim()) {
+          parseMatchPage();
+        }
+      }, 0);
+    });
+    pageFileInput.addEventListener("change", () => {
+      if (pageFileInput.files && pageFileInput.files[0]) {
+        parseMatchPage();
+      }
+    });
+    urlInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        parseMatchPage();
+      }
+    });
+
+    playButton.addEventListener("click", () => {
+      if (state.timer) {
+        stopPlayback();
+      } else {
+        schedulePlayback();
+      }
+    });
+
+    prevButton.addEventListener("click", () => {
+      stopPlayback();
+      setCurrentIndex(state.currentIndex - 1);
+    });
+
+    nextButton.addEventListener("click", () => {
+      stopPlayback();
+      setCurrentIndex(state.currentIndex + 1);
+    });
+
+    timelineRange.addEventListener("input", () => {
+      stopPlayback();
+      setCurrentIndex(Number(timelineRange.value));
+    });
+
+    createFieldLabels();
+    resizeField();
+    renderEventCard(null);
+    updateButtons();
+    window.addEventListener("resize", () => {
+      refreshFieldLayout();
+    });
+    if ("ResizeObserver" in window) {
+      fieldResizeObserver = new ResizeObserver(() => {
+        refreshFieldLayout();
+      });
+      fieldResizeObserver.observe(fieldPanel);
+    }
+  </script>
+</body>
+</html>
