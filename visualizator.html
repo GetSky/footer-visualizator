@@ -604,6 +604,119 @@
       color: var(--danger);
     }
 
+    .progress {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(239, 228, 204, 0.85));
+      display: none;
+      gap: 12px;
+    }
+
+    .progress.visible {
+      display: grid;
+    }
+
+    .progress-head {
+      display: grid;
+      gap: 6px;
+    }
+
+    .progress-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-2);
+    }
+
+    .progress-detail {
+      min-height: 22px;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .progress-track {
+      position: relative;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(24, 79, 67, 0.12);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #d48b33 55%, var(--accent-2));
+      transition: width 220ms ease;
+    }
+
+    .progress-steps {
+      display: grid;
+      gap: 8px;
+    }
+
+    .progress-step {
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      color: var(--muted);
+    }
+
+    .progress-step::before {
+      content: "";
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 1px solid #b8ab89;
+      background: #fffaf0;
+      box-shadow: inset 0 0 0 4px transparent;
+      transition: all 180ms ease;
+    }
+
+    .progress-step strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .progress-step small {
+      display: block;
+      color: inherit;
+      line-height: 1.35;
+    }
+
+    .progress-step.active {
+      color: var(--accent-2);
+    }
+
+    .progress-step.active::before {
+      border-color: var(--accent-2);
+      box-shadow: inset 0 0 0 5px var(--accent-2);
+    }
+
+    .progress-step.done {
+      color: var(--accent-2);
+    }
+
+    .progress-step.done::before {
+      border-color: var(--accent);
+      background: var(--accent);
+      box-shadow: inset 0 0 0 5px #f8dfc3;
+    }
+
+    .progress-step.error {
+      color: var(--danger);
+    }
+
+    .progress-step.error::before {
+      border-color: var(--danger);
+      box-shadow: inset 0 0 0 5px var(--danger);
+    }
+
     @keyframes pulse {
       0% { transform: scale(0.92); opacity: 0.5; }
       70% { transform: scale(1.2); opacity: 0; }
@@ -693,6 +806,16 @@
               <p>Локальный HTML матча или сохранённый HTML с логом</p>
               <input id="pageFileInput" type="file" accept=".html,text/html">
             </div>
+          </div>
+          <div id="progress" class="progress" aria-live="polite">
+            <div class="progress-head">
+              <div class="progress-title">Ход загрузки</div>
+              <div id="progressDetail" class="progress-detail"></div>
+            </div>
+            <div class="progress-track" aria-hidden="true">
+              <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <div id="progressSteps" class="progress-steps"></div>
           </div>
           <div id="status" class="status"></div>
         </div>
@@ -826,6 +949,10 @@
     const eventOpponent = document.getElementById("eventOpponent");
     const eventCoords = document.getElementById("eventCoords");
     const statusNode = document.getElementById("status");
+    const progressNode = document.getElementById("progress");
+    const progressDetailNode = document.getElementById("progressDetail");
+    const progressFillNode = document.getElementById("progressFill");
+    const progressStepsNode = document.getElementById("progressSteps");
 
     const state = {
       events: [],
@@ -840,10 +967,85 @@
     };
 
     let fieldResizeObserver = null;
+    let progressSteps = [];
 
     function setStatus(message, isError) {
       statusNode.textContent = message;
       statusNode.className = isError ? "status error" : "status";
+    }
+
+    function renderProgressSteps() {
+      progressStepsNode.innerHTML = "";
+      progressSteps.forEach((step) => {
+        const item = document.createElement("div");
+        item.className = `progress-step ${step.state}`;
+
+        const textWrap = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = step.title;
+        const description = document.createElement("small");
+        description.textContent = step.description;
+
+        textWrap.append(title, description);
+        item.append(textWrap);
+        progressStepsNode.append(item);
+      });
+    }
+
+    function createProgressFlow(stepDefinitions) {
+      progressSteps = stepDefinitions.map((step) => ({
+        key: step.key,
+        title: step.title,
+        description: step.description,
+        state: "pending"
+      }));
+
+      progressNode.classList.add("visible");
+      progressDetailNode.textContent = "Подготавливаю загрузку...";
+      progressFillNode.style.width = "0%";
+      renderProgressSteps();
+    }
+
+    function updateProgress(stepKey, detail, status) {
+      const currentIndex = progressSteps.findIndex((step) => step.key === stepKey);
+      if (currentIndex === -1) {
+        if (detail) {
+          progressDetailNode.textContent = detail;
+        }
+        return;
+      }
+
+      progressSteps = progressSteps.map((step, index) => {
+        if (step.state === "error" && index !== currentIndex) {
+          return step;
+        }
+        if (index < currentIndex && step.state !== "error") {
+          return { ...step, state: "done" };
+        }
+        if (index === currentIndex) {
+          return { ...step, state: status || "active" };
+        }
+        return { ...step, state: "pending" };
+      });
+
+      const completedSteps = progressSteps.filter((step) => step.state === "done").length;
+      const activeStep = progressSteps[currentIndex];
+      const progressValue = ((completedSteps + (activeStep && activeStep.state === "active" ? 0.5 : 1)) / Math.max(progressSteps.length, 1)) * 100;
+
+      progressDetailNode.textContent = detail || "";
+      progressFillNode.style.width = `${Math.max(4, Math.min(progressValue, 100))}%`;
+      renderProgressSteps();
+    }
+
+    function completeProgress(detail) {
+      progressSteps = progressSteps.map((step) => ({ ...step, state: "done" }));
+      progressDetailNode.textContent = detail;
+      progressFillNode.style.width = "100%";
+      renderProgressSteps();
+    }
+
+    function failProgress(stepKey, detail) {
+      updateProgress(stepKey, detail, "error");
     }
 
     function normalizeText(value) {
@@ -1675,6 +1877,21 @@
     }
 
     function schedulePlayback() {
+      updateProgress(
+        "source",
+        pageFile
+          ? `Источник подтверждён: локальный файл ${pageFile.name}.`
+          : `Источник подтверждён: ссылка ${pageUrl}.`,
+        "done"
+      );
+
+      updateProgress(
+        "source",
+        pageFile
+          ? `Источник подтверждён: локальный файл ${pageFile.name}.`
+          : `Источник подтверждён: ссылка ${pageUrl}.`,
+        "done"
+      );
       stopPlayback();
       if (state.currentIndex >= state.snapshots.length - 1) {
         setCurrentIndex(0);
@@ -1716,14 +1933,23 @@
     async function parseMatchPage() {
       const pageUrl = urlInput.value.trim();
       const pageFile = pageFileInput.files && pageFileInput.files[0] ? pageFileInput.files[0] : null;
+      createProgressFlow([
+        { key: "source", title: "Проверка источника", description: "Понимаем, откуда брать HTML матча." },
+        { key: "match", title: "Загрузка страницы матча", description: "Читаем локальный файл или запрашиваем страницу." },
+        { key: "log", title: "Поиск match log", description: "Ищем `#full_log` или отдельную страницу лога." },
+        { key: "events", title: "Разбор событий", description: "Преобразуем HTML в структуру событий." },
+        { key: "build", title: "Сборка визуализации", description: "Строим таймлайн, счёт и позиции игроков." }
+      ]);
       if (!pageUrl) {
         if (!pageFile) {
+          failProgress("source", "Источник не выбран. Нужна ссылка или локальный HTML-файл.");
           setStatus("Нужна ссылка или локальный HTML матча.", true);
           return;
         }
       }
 
       if (!pageUrl && !pageFile) {
+        failProgress("source", "Источник не выбран. Укажи ссылку или файл.");
         setStatus("Нужен источник данных.", true);
         return;
       }
@@ -1753,30 +1979,36 @@
         let statusText = "";
 
         if (pageFile) {
+          updateProgress("match", `Читаю локальный файл ${pageFile.name}...`);
           const pageHtml = await readFileText(pageFile);
           pageDoc = parseHtml(pageHtml);
           statusText = `Матч загружен из локального файла ${pageFile.name}.`;
         } else if (pageUrl) {
+          updateProgress("match", "Запрашиваю страницу матча...");
           const pageResult = await fetchWithFallbacks(pageUrl);
           pageDoc = parseHtml(pageResult.text);
           statusText = `Страница загружена через ${pageResult.resolvedVia}.`;
         }
 
         if (pageDoc) {
+          updateProgress("log", "Проверяю, есть ли лог прямо на странице матча...");
           const fullLogOnPage = pageDoc.querySelector("#full_log");
 
           if (fullLogOnPage && normalizeText(fullLogOnPage.textContent)) {
             logDoc = pageDoc;
             finalLogUrl = pageUrl || getLocalSourceLabel(pageFile);
+            updateProgress("log", "Лог найден в основном HTML. Дополнительная загрузка не нужна.", "done");
           } else {
             const detectedLogUrl = pageUrl ? extractMatchLogUrl(pageDoc, pageUrl) : null;
             if (!detectedLogUrl) {
               throw new Error("В выбранном локальном HTML нет содержимого #full_log. Выберите HTML, где уже есть лог матча, или используйте ссылку.");
             }
 
+            updateProgress("log", `Нашёл отдельный match log. Загружаю ${detectedLogUrl}...`);
             const logResult = await fetchWithFallbacks(detectedLogUrl);
             logDoc = parseHtml(logResult.text);
             finalLogUrl = detectedLogUrl;
+            updateProgress("log", "Match log загружен, обновляю структуру данных...", "done");
             statusText = `${statusText} Match log загружен через ${logResult.resolvedVia}.`.trim();
           }
         }
@@ -1785,10 +2017,12 @@
           throw new Error("Не удалось получить HTML match_log.");
         }
 
+        updateProgress("events", "Читаю и нормализую события матча...");
         const fullLog = logDoc.querySelector("#full_log") || logDoc.body;
         const rendered = renderFullLog(fullLog);
         const events = rendered.events.filter((event) => event.action || event.cue1 || event.position);
 
+        updateProgress("build", `Собираю визуализацию по ${events.length} событиям...`);
         state.events = events;
         state.text = rendered.text;
         state.teams = extractTeamsFromMatchDoc(pageDoc || logDoc, events);
@@ -1807,12 +2041,14 @@
           renderEventCard(null);
         }
 
+        completeProgress(`Готово. Загружено ${events.length} событий${finalLogUrl ? ` из ${finalLogUrl}.` : "."}`);
         setStatus(statusText);
       } catch (error) {
         const errorMessage = String(error && error.message ? error.message : error);
         const corsHint = window.location.protocol === "file:"
           ? " Страница открыта как file://, поэтому прямой fetch на footter блокируется браузером. Используйте локальный HTML с уже сохранённым логом или откройте страницу через локальный http-сервер."
           : "";
+        failProgress("match", `${errorMessage}${corsHint}`);
         setStatus(`${errorMessage}${corsHint}`, true);
       }
     }
