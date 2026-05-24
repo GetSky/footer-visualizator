@@ -196,6 +196,49 @@
       white-space: nowrap;
     }
 
+    #teamsLabel {
+      min-width: 0;
+      flex: 1 1 auto;
+      text-align: left;
+    }
+
+    .scoreboard {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .scoreboard-team {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .scoreboard-team.home {
+      flex-direction: row;
+    }
+
+    .scoreboard-team.away {
+      flex-direction: row;
+    }
+
+    .scoreboard-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .scoreboard-score,
+    .scoreboard-divider {
+      flex: 0 0 auto;
+      color: var(--text);
+      font-weight: 700;
+    }
+
     .viewer {
       display: grid;
       grid-template-columns: 1fr;
@@ -801,6 +844,38 @@
       .timeline-label {
         padding-right: 0;
         text-align: right;
+      }
+
+      .match-bar {
+        align-items: flex-start;
+      }
+
+      #teamsLabel {
+        text-align: left;
+      }
+
+      .scoreboard {
+        display: inline-grid;
+        gap: 4px;
+      }
+
+      .scoreboard-team {
+        display: inline-grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        justify-content: start;
+      }
+
+      .scoreboard-team.home,
+      .scoreboard-team.away {
+        flex-direction: unset;
+      }
+
+      .scoreboard-team.home .scoreboard-score {
+        order: -1;
+      }
+
+      .scoreboard-divider {
+        display: none;
       }
 
       .kv {
@@ -1946,11 +2021,22 @@
     function fillSummary() {
       const home = state.teams[0] || "Команда 1";
       const away = state.teams[1] || "Команда 2";
-      const scoreLabel = `${state.score[0] ?? 0}:${state.score[1] ?? 0}`;
       const currentEvent = state.events[state.currentIndex];
       const minuteLabel = currentEvent && currentEvent.time !== undefined ? `${currentEvent.time} мин` : "-";
       teamsLabel.innerHTML = state.teams.length
-        ? `${formatTeamName(home)} <span style="color: var(--text); font-weight: 700;">${scoreLabel}</span> ${formatTeamName(away)}`
+        ? `
+          <span class="scoreboard">
+            <span class="scoreboard-team home">
+              <span class="scoreboard-name team-home">${home}</span>
+              <span class="scoreboard-score">${state.score[0] ?? 0}</span>
+            </span>
+            <span class="scoreboard-divider">:</span>
+            <span class="scoreboard-team away">
+              <span class="scoreboard-score">${state.score[1] ?? 0}</span>
+              <span class="scoreboard-name team-away">${away}</span>
+            </span>
+          </span>
+        `
         : "-";
       matchMinute.textContent = minuteLabel;
     }
