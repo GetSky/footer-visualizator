@@ -1,0 +1,24 @@
+services:
+  footter-proxy-match:
+    image: ${FOOTTER_PROXY_IMAGE:-ghcr.io/getsky/footer-visualizator/footter-proxy-match:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: footter-proxy-match
+    restart: unless-stopped
+    environment:
+      ACME_DOMAIN: ${ACME_DOMAIN:-getsky.tech}
+      ACME_CACHE_DIR: /var/lib/footter-proxy-match/certs
+      HTTP_ADDR: :80
+      TLS_ADDR: :443
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/lib/footter-proxy-match/certs:/var/lib/footter-proxy-match/certs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
