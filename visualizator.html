@@ -1573,7 +1573,7 @@
       const [safeRow, safeCol] = clampCoord(row, col);
       return {
         x: ((safeRow - 0.5) / FIELD_ROWS) * 100,
-        y: ((FIELD_COLS - safeCol) + 0.5) / FIELD_COLS * 100
+        y: ((safeCol - 0.5) / FIELD_COLS) * 100
       };
     }
 
