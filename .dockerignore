@@ -1,0 +1,11 @@
+.git
+.github
+dist
+docs
+imgs
+test_data
+visualizator.html
+.env
+Dockerfile
+docker-compose.yml
+*.md

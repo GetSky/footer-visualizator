@@ -76,7 +76,7 @@ func runTLSServer(domain string) {
 
 	go func() {
 		log.Printf("footter proxy ACME challenge server listening on http://%s", httpAddr)
-		if err := http.ListenAndServe(httpAddr, certManager.HTTPHandler(redirectToHTTPS())); err != nil {
+		if err := http.ListenAndServe(httpAddr, certManager.HTTPHandler(healthOrRedirect(mux))); err != nil {
 			log.Fatal(err)
 		}
 	}()
@@ -108,6 +108,16 @@ func redirectToHTTPS() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		target := "https://" + r.Host + r.URL.RequestURI()
 		http.Redirect(w, r, target, http.StatusMovedPermanently)
+	})
+}
+
+func healthOrRedirect(mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			mux.ServeHTTP(w, r)
+			return
+		}
+		redirectToHTTPS().ServeHTTP(w, r)
 	})
 }
 
