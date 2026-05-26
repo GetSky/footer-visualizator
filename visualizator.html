@@ -2164,6 +2164,10 @@
       return root.innerHTML || "Описание отсутствует.";
     }
 
+    function stripLeadingCoordsPrefix(rawHtml) {
+      return String(rawHtml || "").replace(/^\s*\[[^\[\]]+\]\s*/, "");
+    }
+
     function renderEventCard(snapshot) {
       if (!snapshot) {
         eventClock.textContent = "Минута -";
@@ -2192,7 +2196,9 @@
         ? JSON.stringify(event.position)
         : "-";
       currentLogCard.className = `current-log-card ${teamSide}`;
-      currentLogText.innerHTML = sanitizeEventHtml(event.cue1 || event.raw_text || "Описание отсутствует.");
+      currentLogText.innerHTML = sanitizeEventHtml(
+        stripLeadingCoordsPrefix(event.cue1 || event.raw_text || "Описание отсутствует.")
+      );
     }
 
     function renderEventList() {
