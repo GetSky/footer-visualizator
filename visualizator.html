@@ -1092,6 +1092,7 @@
       teams: [],
       score: [0, 0],
       teamByPlayerId: {},
+      playerPositionById: {},
       snapshots: [],
       currentIndex: 0,
       timer: null,
@@ -1440,6 +1441,73 @@
       return Array.from(new Set(events.map((event) => normalizeText(event.team)).filter(Boolean))).slice(0, 2);
     }
 
+    function isFootballPosition(value) {
+      return /^(GK|LD|CD|RD|LWB|DM|RWB|LM|CM|RM|LW|AM|RW|CF)$/i.test(normalizeText(value));
+    }
+
+    function normalizePlayerNameKey(value) {
+      return normalizeText(value).toLowerCase();
+    }
+
+    function extractPositionByPlayerName(doc) {
+      const map = {};
+      if (!doc) {
+        return map;
+      }
+
+      Array.from(doc.querySelectorAll("table.players tr, #player-stat_div table tr")).forEach((row) => {
+        const cells = Array.from(row.querySelectorAll("td")).map((cell) => normalizeText(cell.textContent));
+        if (cells.length < 3) {
+          return;
+        }
+
+        let position = "";
+        let playerName = "";
+
+        if (isFootballPosition(cells[0])) {
+          position = cells[0];
+          playerName = cells[1];
+        } else if (isFootballPosition(cells[2])) {
+          position = cells[2];
+          playerName = cells[1];
+        }
+
+        const key = normalizePlayerNameKey(playerName);
+        if (key && position) {
+          map[key] = position.toUpperCase();
+        }
+      });
+
+      return map;
+    }
+
+    function collectEventPlayers(event) {
+      return [
+        parsePlayerValue(event.player_with_ball),
+        parsePlayerValue(event.target),
+        parsePlayerValue(event.opponent)
+      ].filter(Boolean);
+    }
+
+    function buildPlayerPositionById(events, positionByPlayerName) {
+      const map = {};
+
+      events.forEach((event) => {
+        collectEventPlayers(event).forEach((player) => {
+          if (!player.id || map[player.id]) {
+            return;
+          }
+
+          const position = positionByPlayerName[normalizePlayerNameKey(player.name)];
+          if (position) {
+            map[player.id] = position;
+          }
+        });
+      });
+
+      return map;
+    }
+
     function extractTeamsFromMatchDoc(doc, events) {
       if (!doc) {
         return getUniqueTeams(events);
@@ -1566,10 +1634,20 @@
       return clampCoord(coord[0], coord[1]);
     }
 
+    function getPlayerMarkerLabel(player) {
+      if (player && player.id && state.playerPositionById[player.id]) {
+        return state.playerPositionById[player.id];
+      }
+
+      const name = player && player.name ? player.name : "";
+      return name.split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").slice(0, 2).toUpperCase() || "P";
+    }
+
     function makePlayerState(player, team, row, col, role, index, fallbackColor) {
       return {
         id: player ? player.id : `${role}_${index}`,
         name: player ? player.name : role,
+        markerLabel: getPlayerMarkerLabel(player),
         team: team || fallbackColor,
         row,
         col,
@@ -2035,8 +2113,6 @@
         const stack = stackMap.get(`${player.row}:${player.col}`) || [player];
         const stackIndex = stack.findIndex((item) => item.markerId === playerId);
         const verticalOffset = (stackIndex - ((stack.length - 1) / 2)) * 50;
-        const initials = player.name.split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").slice(0, 2).toUpperCase();
-
         marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isFailedTarget ? "failed-target" : ""}`;
         marker.style.left = `${pos.x}%`;
         marker.style.top = `calc(${pos.y}% + ${verticalOffset}px)`;
@@ -2044,7 +2120,7 @@
           ? "12"
           : (player.markerPhase === "next" ? "10" : "15");
         marker.innerHTML = `
-          <span>${initials || "P"}</span>
+          <span>${player.markerLabel || "P"}</span>
           <span class="player-tag ${player.hasDangerArrow ? "danger-tag" : ""}">${player.hasDangerArrow ? '<span class="danger-arrow">↓</span>' : ""}${player.name}</span>
         `;
 
@@ -2292,6 +2368,7 @@
       state.teams = [];
       state.score = [0, 0];
       state.teamByPlayerId = {};
+      state.playerPositionById = {};
       state.markerNodes = {};
       renderMarkers(null);
       renderEventCard(null);
@@ -2354,6 +2431,10 @@
         state.teams = extractTeamsFromMatchDoc(pageDoc || logDoc, events);
         state.score = buildScore(events, state.teams);
         state.teamByPlayerId = inferTeamByPlayer(events, state.teams);
+        state.playerPositionById = buildPlayerPositionById(
+          events,
+          extractPositionByPlayerName(pageDoc || logDoc)
+        );
         state.snapshots = buildSnapshots(events, state.teams, state.teamByPlayerId);
 
         fillSummary();
