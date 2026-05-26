@@ -1675,8 +1675,11 @@
         const action = String(event.action || "").toLowerCase();
         const isKickoff = action === "розыгрыш";
         const localPoint = getEventPoint(event);
+        const nextEvent = events[index + 1] || null;
+        const nextLocalPoint = nextEvent ? getEventPoint(nextEvent) : null;
+        const kickoffPoint = toGlobalCoord(nextLocalPoint, team, teams);
         const currentPoint = isKickoff
-          ? KICKOFF_POINT
+          ? (kickoffPoint || KICKOFF_POINT)
           : (toGlobalCoord(localPoint, team, teams) || START_COORD_FALLBACK);
 
         if (actor) {
@@ -2036,7 +2039,10 @@
         });
       }
 
-      if (nextSnapshot) {
+      const currentAction = String((currentSnapshot && currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
+      const shouldRenderNextSnapshotPlayers = nextSnapshot && currentAction !== "розыгрыш";
+
+      if (shouldRenderNextSnapshotPlayers) {
         Object.values(nextSnapshot.players).forEach((player) => {
           entries.push({
             ...player,
