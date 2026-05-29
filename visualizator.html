@@ -1785,12 +1785,18 @@
     function isPassAction(action) {
       return action === "pass"
         || action === "short_pass"
+        || action === "medium_pass"
         || action === "long_pass"
         || action === "naves"
+        || action === "corner_pass"
+        || action === "prostrel"
         || action === "пас"
         || action === "короткий пас"
+        || action === "средний пас"
         || action === "длинный пас"
-        || action === "навес";
+        || action === "навес"
+        || action === "угловой"
+        || action === "прострел";
     }
 
     function isShotAction(action) {
@@ -1804,6 +1810,16 @@
 
     function isSubstitutionAction(action) {
       return action === "замена";
+    }
+
+    function isFoulAction(action) {
+      return action === "нарушение"
+        || action === "foul"
+        || action === "violation";
+    }
+
+    function getSnapshotAction(snapshot) {
+      return String((snapshot && snapshot.event && snapshot.event.action) || "").toLowerCase();
     }
 
     function isZeroLikeResult(result) {
@@ -1834,9 +1850,39 @@
       return state.teams.find((item) => item !== teamName) || teamName;
     }
 
+    function isPassFollowedByFoul(currentSnapshot, nextSnapshot) {
+      if (!currentSnapshot || !nextSnapshot) {
+        return false;
+      }
+
+      const action = getSnapshotAction(currentSnapshot);
+      return isPassAction(action) && isFoulAction(getSnapshotAction(nextSnapshot));
+    }
+
+    function getPassRenderTargetSnapshot(currentSnapshot, nextSnapshot) {
+      if (!isPassFollowedByFoul(currentSnapshot, nextSnapshot)) {
+        return nextSnapshot;
+      }
+
+      const foulIndex = state.snapshots.indexOf(nextSnapshot);
+      if (foulIndex < 0) {
+        return nextSnapshot;
+      }
+
+      return getNextRenderableSnapshot(foulIndex) || nextSnapshot;
+    }
+
     function getPassRenderTargetPoint(currentSnapshot, nextSnapshot) {
-      if (nextSnapshot && nextSnapshot.focusPoint) {
-        return nextSnapshot.focusPoint;
+      const targetSnapshot = getPassRenderTargetSnapshot(currentSnapshot, nextSnapshot);
+      if (isPassFollowedByFoul(currentSnapshot, nextSnapshot) && targetSnapshot) {
+        const rawTargetPoint = getEventPoint(targetSnapshot.event);
+        if (rawTargetPoint) {
+          return rawTargetPoint;
+        }
+      }
+
+      if (targetSnapshot && targetSnapshot.focusPoint) {
+        return targetSnapshot.focusPoint;
       }
 
       return getCoordsPair(currentSnapshot.event).to;
@@ -1848,7 +1894,9 @@
       }
 
       const action = String((currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
-      if (!isPassAction(action) || isZeroLikeResult(currentSnapshot.event.result)) {
+      const passFollowedByFoul = isPassFollowedByFoul(currentSnapshot, nextSnapshot);
+      const opponentWonPass = isFailedPassResult(currentSnapshot.event.result);
+      if (!isPassAction(action) || (!passFollowedByFoul && isZeroLikeResult(currentSnapshot.event.result))) {
         return null;
       }
 
@@ -1858,7 +1906,7 @@
         return null;
       }
 
-      if (nextSnapshot) {
+      if (nextSnapshot && !passFollowedByFoul) {
         const nextActor = parsePlayerValue(nextSnapshot.event.player_with_ball);
         if (nextActor && !samePlayer(target, nextActor)) {
           return null;
@@ -1888,17 +1936,19 @@
         markerId: `incoming-opponent:${currentSnapshot.event.index}:${opponent.id || opponent.name}`,
         markerPhase: "overlay",
         isIncomingOpponent: true,
-        hasDangerArrow: true
+        hasDangerArrow: !opponentWonPass
       };
     }
 
-    function getFailedTargetMarker(currentSnapshot, nextSnapshot) {
+    function getPassTargetMarker(currentSnapshot, nextSnapshot) {
       if (!currentSnapshot) {
         return null;
       }
 
       const action = String((currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
-      if (!isPassAction(action) || !isFailedPassResult(currentSnapshot.event.result)) {
+      const passFollowedByFoul = isPassFollowedByFoul(currentSnapshot, nextSnapshot);
+      const isFailedTarget = isFailedPassResult(currentSnapshot.event.result);
+      if (!isPassAction(action) || (!isFailedTarget && !passFollowedByFoul)) {
         return null;
       }
 
@@ -1919,13 +1969,14 @@
           targetTeam,
           targetPoint[0],
           targetPoint[1],
-          "failed-target",
+          "pass-target",
           currentSnapshot.event.index,
           targetTeam
         ),
-        markerId: `failed-target:${currentSnapshot.event.index}:${target.id || target.name}`,
+        markerId: `pass-target:${currentSnapshot.event.index}:${target.id || target.name}`,
         markerPhase: "overlay",
-        isFailedTarget: true,
+        isPassTarget: true,
+        isFailedTarget,
         hasDangerArrow: true
       };
     }
@@ -1939,6 +1990,24 @@
         }
       }
       return null;
+    }
+
+    function getPreviousRenderableSnapshot(startIndex) {
+      for (let index = startIndex - 1; index >= 0; index--) {
+        const snapshot = state.snapshots[index];
+        const action = String((snapshot && snapshot.event && snapshot.event.action) || "").toLowerCase();
+        if (!isSubstitutionAction(action)) {
+          return snapshot;
+        }
+      }
+      return null;
+    }
+
+    function applyFoulDangerMarker(player, foulTeam) {
+      return {
+        ...player,
+        hasDangerArrow: normalizeText(player.team) === foulTeam
+      };
     }
 
     function buildScore(events, teams) {
@@ -2042,8 +2111,35 @@
 
       const entries = [];
       const stackMap = new Map();
+      const currentAction = String((currentSnapshot && currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
+      const isFoulFrame = currentSnapshot && isFoulAction(currentAction);
 
-      if (currentSnapshot) {
+      if (isFoulFrame) {
+        const previousSnapshot = getPreviousRenderableSnapshot(state.currentIndex);
+        const foulTeam = normalizeText(currentSnapshot.event.team);
+
+        if (previousSnapshot) {
+          Object.values(previousSnapshot.players).forEach((player) => {
+            entries.push(applyFoulDangerMarker({
+              ...player,
+              markerId: `foul-current:${player.id}`,
+              markerPhase: "current"
+            }, foulTeam));
+          });
+
+          const incomingOpponent = getIncomingOpponentMarker(previousSnapshot, currentSnapshot);
+          if (incomingOpponent) {
+            entries.push(applyFoulDangerMarker(incomingOpponent, foulTeam));
+          }
+
+          const passTarget = getPassTargetMarker(previousSnapshot, currentSnapshot);
+          if (passTarget) {
+            entries.push(applyFoulDangerMarker(passTarget, foulTeam));
+          }
+        }
+      }
+
+      if (currentSnapshot && !isFoulFrame) {
         Object.values(currentSnapshot.players).forEach((player) => {
           entries.push({
             ...player,
@@ -2053,8 +2149,10 @@
         });
       }
 
-      const currentAction = String((currentSnapshot && currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
-      const shouldRenderNextSnapshotPlayers = nextSnapshot && currentAction !== "розыгрыш";
+      const shouldRenderNextSnapshotPlayers = nextSnapshot
+        && !isFoulFrame
+        && currentAction !== "розыгрыш"
+        && !isPassFollowedByFoul(currentSnapshot, nextSnapshot);
 
       if (shouldRenderNextSnapshotPlayers) {
         Object.values(nextSnapshot.players).forEach((player) => {
@@ -2066,14 +2164,16 @@
         });
       }
 
-      const incomingOpponent = getIncomingOpponentMarker(currentSnapshot, nextSnapshot);
-      if (incomingOpponent) {
-        entries.push(incomingOpponent);
-      }
+      if (!isFoulFrame) {
+        const incomingOpponent = getIncomingOpponentMarker(currentSnapshot, nextSnapshot);
+        if (incomingOpponent) {
+          entries.push(incomingOpponent);
+        }
 
-      const failedTarget = getFailedTargetMarker(currentSnapshot, nextSnapshot);
-      if (failedTarget) {
-        entries.push(failedTarget);
+        const passTarget = getPassTargetMarker(currentSnapshot, nextSnapshot);
+        if (passTarget) {
+          entries.push(passTarget);
+        }
       }
 
       const nextIds = new Set(entries.map((player) => player.markerId));
@@ -2133,10 +2233,10 @@
         const stack = stackMap.get(`${player.row}:${player.col}`) || [player];
         const stackIndex = stack.findIndex((item) => item.markerId === playerId);
         const verticalOffset = (stackIndex - ((stack.length - 1) / 2)) * 50;
-        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isFailedTarget ? "failed-target" : ""}`;
+        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""}`;
         marker.style.left = `${pos.x}%`;
         marker.style.top = `calc(${pos.y}% + ${verticalOffset}px)`;
-        marker.style.zIndex = (player.isIncomingOpponent || player.isFailedTarget)
+        marker.style.zIndex = (player.isIncomingOpponent || player.isPassTarget)
           ? "12"
           : (player.markerPhase === "next" ? "10" : "15");
         marker.innerHTML = `
