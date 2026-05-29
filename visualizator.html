@@ -1047,6 +1047,8 @@
       "команда": "team",
       "минута": "time",
       "итерация": "step",
+      "itreation": "step",
+      "iteration": "step",
       "действие": "action",
       "принимающий": "target",
       "коорд": "position",
@@ -1573,6 +1575,7 @@
         "dribling": "Дриблинг",
         "pass": "Пас",
         "удар": "Удар",
+        "пенальти": "Пенальти",
         "medium_shot": "Средний удар",
         "long_shot": "Дальний удар",
         "нарушение": "Нарушение",
@@ -1656,6 +1659,11 @@
       };
     }
 
+    function getPenaltySpot(teamName, teams) {
+      const teamIndex = teams.indexOf(normalizeText(teamName));
+      return teamIndex === 1 ? [2, 2.5] : [13, 2.5];
+    }
+
     function buildSnapshots(events, teams, teamByPlayerId) {
       const snapshots = [];
 
@@ -1674,13 +1682,18 @@
         const actorTeam = actor && actor.id && teamByPlayerId[actor.id] ? teamByPlayerId[actor.id] : team;
         const action = String(event.action || "").toLowerCase();
         const isKickoff = action === "розыгрыш";
+        const isPenalty = action === "пенальти";
         const localPoint = getEventPoint(event);
         const nextEvent = events[index + 1] || null;
         const nextLocalPoint = nextEvent ? getEventPoint(nextEvent) : null;
         const kickoffPoint = toGlobalCoord(nextLocalPoint, team, teams);
         const currentPoint = isKickoff
           ? (kickoffPoint || KICKOFF_POINT)
-          : (toGlobalCoord(localPoint, team, teams) || START_COORD_FALLBACK);
+          : (
+            isPenalty
+              ? getPenaltySpot(team, teams)
+              : (toGlobalCoord(localPoint, team, teams) || START_COORD_FALLBACK)
+          );
 
         if (actor) {
           framePlayers[actor.id || `actor_${event.index}`] = makePlayerState(actor, actorTeam, currentPoint[0], currentPoint[1], "ball", event.index, defaultTeams.home);
@@ -1782,6 +1795,7 @@
 
     function isShotAction(action) {
       return action === "удар"
+        || action === "пенальти"
         || action === "medium_shot"
         || action === "long_shot"
         || action === "средний удар"
