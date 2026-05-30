@@ -2529,6 +2529,20 @@
       timelineRange.value = "0";
     }
 
+    function normalizeMatchQueryValue(value) {
+      const trimmedValue = value.trim();
+      if (/^\d+$/.test(trimmedValue)) {
+        return `https://footter.com/match/${trimmedValue}/`;
+      }
+      return trimmedValue;
+    }
+
+    function getMatchUrlFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const queryValue = params.get("url") || params.get("match_url") || params.get("match");
+      return queryValue ? normalizeMatchQueryValue(queryValue) : "";
+    }
+
     async function parseMatchPage() {
       const pageUrl = urlInput.value.trim();
       const pageFile = pageFileInput.files && pageFileInput.files[0] ? pageFileInput.files[0] : null;
@@ -2681,6 +2695,12 @@
         parseMatchPage();
       }
     });
+
+    const queryMatchUrl = getMatchUrlFromQuery();
+    if (queryMatchUrl) {
+      urlInput.value = queryMatchUrl;
+      parseMatchPage();
+    }
 
     playButton.addEventListener("click", () => {
       if (state.timer) {
