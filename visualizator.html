@@ -1812,6 +1812,11 @@
       return action === "замена";
     }
 
+    function isDribbleAction(action) {
+      return action === "dribling"
+        || action === "дриблинг";
+    }
+
     function isFoulAction(action) {
       return action === "нарушение"
         || action === "foul"
@@ -1935,7 +1940,7 @@
         ),
         markerId: `incoming-opponent:${currentSnapshot.event.index}:${opponent.id || opponent.name}`,
         markerPhase: "overlay",
-        isIncomingOpponent: true,
+        isIncomingOpponent: !opponentWonPass,
         hasDangerArrow: !opponentWonPass
       };
     }
@@ -2008,6 +2013,75 @@
         ...player,
         hasDangerArrow: normalizeText(player.team) === foulTeam
       };
+    }
+
+    function getFoulContestPoint(previousSnapshot, nextSnapshot) {
+      if (nextSnapshot && nextSnapshot.event) {
+        const nextPoint = getEventPoint(nextSnapshot.event);
+        if (nextPoint) {
+          return nextPoint;
+        }
+      }
+
+      if (!previousSnapshot || !previousSnapshot.event) {
+        return null;
+      }
+
+      return getCoordsPair(previousSnapshot.event).to || previousSnapshot.focusPoint;
+    }
+
+    function getFoulContestMarkers(currentSnapshot, previousSnapshot, nextSnapshot, foulTeam) {
+      const point = getFoulContestPoint(previousSnapshot, nextSnapshot);
+      if (!currentSnapshot || !point) {
+        return [];
+      }
+
+      const actor = parsePlayerValue(currentSnapshot.event.player_with_ball);
+      const opponent = parsePlayerValue(currentSnapshot.event.opponent);
+      const actorTeam = actor && actor.id && state.teamByPlayerId[actor.id]
+        ? state.teamByPlayerId[actor.id]
+        : getOtherTeam(foulTeam);
+      const opponentTeam = opponent && opponent.id && state.teamByPlayerId[opponent.id]
+        ? state.teamByPlayerId[opponent.id]
+        : foulTeam;
+      const markers = [];
+
+      if (actor) {
+        markers.push(applyFoulDangerMarker({
+          ...makePlayerState(
+            actor,
+            actorTeam,
+            point[0],
+            point[1],
+            "ball",
+            currentSnapshot.event.index,
+            actorTeam
+          ),
+          markerId: `foul-actor:${currentSnapshot.event.index}:${actor.id || actor.name}`,
+          markerPhase: "overlay",
+          isFoulContest: true
+        }, foulTeam));
+      }
+
+      if (opponent) {
+        markers.push(applyFoulDangerMarker({
+          ...makePlayerState(
+            opponent,
+            opponentTeam,
+            point[0],
+            point[1],
+            "foul-opponent",
+            currentSnapshot.event.index,
+            opponentTeam
+          ),
+          markerId: `foul-opponent:${currentSnapshot.event.index}:${opponent.id || opponent.name}`,
+          markerPhase: "overlay",
+          isIncomingOpponent: true,
+          isFoulContest: true
+        }, foulTeam));
+      }
+
+      return markers;
     }
 
     function buildScore(events, teams) {
@@ -2117,15 +2191,12 @@
       if (isFoulFrame) {
         const previousSnapshot = getPreviousRenderableSnapshot(state.currentIndex);
         const foulTeam = normalizeText(currentSnapshot.event.team);
+        const previousAction = getSnapshotAction(previousSnapshot);
 
         if (previousSnapshot) {
-          Object.values(previousSnapshot.players).forEach((player) => {
-            entries.push(applyFoulDangerMarker({
-              ...player,
-              markerId: `foul-current:${player.id}`,
-              markerPhase: "current"
-            }, foulTeam));
-          });
+          if (isDribbleAction(previousAction)) {
+            entries.push(...getFoulContestMarkers(currentSnapshot, previousSnapshot, nextSnapshot, foulTeam));
+          }
 
           const incomingOpponent = getIncomingOpponentMarker(previousSnapshot, currentSnapshot);
           if (incomingOpponent) {
