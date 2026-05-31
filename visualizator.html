@@ -91,10 +91,11 @@
     }
 
     .panel {
+      width: 100%;
       background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 16px;
+      border-radius: 17px 17px 0 0;
+      padding: 2px;
+      padding-bottom: 0;
     }
 
     .controls {
@@ -118,7 +119,7 @@
     select {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 999px;
       padding: 11px 16px;
       background: #fff;
       color: inherit;
@@ -126,7 +127,7 @@
 
     button {
       border: 0;
-      border-radius: 12px;
+      border-radius: 999px;
       padding: 12px 16px;
       background: linear-gradient(135deg, var(--accent), #cd6a20);
       color: #fff;
@@ -156,8 +157,8 @@
     .meta-card {
       background: #f2ead8;
       border: 1px solid #c8bea8;
-      border-radius: 14px;
-      padding: 10px 14px;
+      border-radius: 14px 14px 0 0;
+      padding: 8px 10px;
       min-width: 240px;
       text-align: center;
     }
@@ -181,15 +182,15 @@
     }
 
     .match-bar {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(150px, 0.65fr) 75px minmax(420px, 1.35fr);
       align-items: center;
-      justify-content: space-between;
-      gap: 16px;
+      gap: 10px;
       width: 100%;
     }
 
     .match-minute {
-      flex: 0 0 auto;
+      justify-self: start;
       color: var(--muted);
       font-size: 15px;
       font-weight: 700;
@@ -198,31 +199,23 @@
 
     #teamsLabel {
       min-width: 0;
-      flex: 1 1 auto;
       text-align: left;
     }
 
     .scoreboard {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
+      display: inline-grid;
+      gap: 4px;
       min-width: 0;
       max-width: 100%;
     }
 
     .scoreboard-team {
-      display: inline-flex;
+      display: inline-grid;
+      grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
-      gap: 8px;
+      justify-content: start;
+      column-gap: 8px;
       min-width: 0;
-    }
-
-    .scoreboard-team.home {
-      flex-direction: row;
-    }
-
-    .scoreboard-team.away {
-      flex-direction: row;
     }
 
     .scoreboard-name {
@@ -239,12 +232,17 @@
       font-weight: 700;
     }
 
+    .scoreboard-divider {
+      display: none;
+    }
+
     .viewer {
       display: grid;
       grid-template-columns: 1fr;
       gap: 0;
       min-height: 100svh;
       padding: 14px;
+      padding-bottom: 0px;
       max-width: 1000px;
       margin: 0 auto;
     }
@@ -274,19 +272,19 @@
       position: relative;
       width: min(100%, 1000px);
       min-height: 0;
-      border-radius: 28px;
+      border-radius: 0;
       overflow: hidden;
       background:
         linear-gradient(90deg, var(--field) 0 7.14%, var(--field-dark) 7.14% 14.28%, var(--field) 14.28% 21.42%, var(--field-dark) 21.42% 28.56%, var(--field) 28.56% 35.7%, var(--field-dark) 35.7% 42.84%, var(--field) 42.84% 49.98%, var(--field-dark) 49.98% 57.12%, var(--field) 57.12% 64.26%, var(--field-dark) 64.26% 71.4%, var(--field) 71.4% 78.54%, var(--field-dark) 78.54% 85.68%, var(--field) 85.68% 92.82%, var(--field-dark) 92.82% 100%);
-      border: 4px solid #f5f1e7;
+      border: 2px solid #f5f1e7;
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
       margin: 0 auto;
     }
 
     .current-log-card {
       width: min(100%, 1000px);
-      margin: 10px auto 0;
-      border-radius: 18px;
+      margin: 0;
+      border-radius: 0 0 14px 14px;
       padding: 14px 16px;
       border: 1px solid #c8bea8;
       transition: background-color 220ms ease, border-color 220ms ease;
@@ -537,21 +535,29 @@
 
     .timeline {
       display: grid;
-      grid-template-columns: 64px 96px 64px 96px minmax(140px, 1fr) max-content;
-      gap: 10px;
+      grid-template-columns: 42px 72px 42px 74px minmax(120px, 1fr) max-content;
+      gap: 6px;
       align-items: center;
+      min-width: 0;
     }
 
     .timeline input[type="range"] {
       width: 100%;
+      min-width: 0;
       accent-color: var(--accent);
+    }
+
+    .timeline button,
+    .timeline select {
+      min-height: 32px;
+      padding: 0px 9px;
     }
 
     .timeline-counter {
       display: inline-flex;
       align-items: center;
       justify-self: end;
-      gap: 8px;
+      gap: 6px;
       white-space: nowrap;
     }
 
@@ -564,7 +570,7 @@
       color: var(--accent-2);
       cursor: pointer;
       font: 800 14px/1 "Source Code Pro", monospace;
-      padding: 7px 11px;
+      padding: 7px 9px;
       text-align: center;
     }
 
@@ -582,8 +588,8 @@
     }
 
     .timeline-info-button {
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border: 1px solid #d7c2a1;
       border-radius: 999px;
       background: #f7f0e3;
@@ -935,6 +941,7 @@
       .viewer {
         min-height: 100svh;
         padding: 12px;
+        padding-bottom: 0px;
       }
 
       .side-panel {
@@ -961,8 +968,16 @@
         grid-template-columns: 1fr;
       }
 
+      .match-bar {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px 10px;
+      }
+
       .timeline {
+        grid-column: 1 / -1;
         grid-template-columns: repeat(4, minmax(0, 1fr));
+        order: 3;
       }
 
       .timeline button,
@@ -982,36 +997,16 @@
         justify-self: end;
       }
 
-      .match-bar {
-        align-items: flex-start;
-      }
-
       #teamsLabel {
         text-align: left;
       }
 
       .scoreboard {
-        display: inline-grid;
         gap: 4px;
       }
 
       .scoreboard-team {
-        display: inline-grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        justify-content: start;
-      }
-
-      .scoreboard-team.home,
-      .scoreboard-team.away {
-        flex-direction: unset;
-      }
-
-      .scoreboard-team.home .scoreboard-score {
-        order: -1;
-      }
-
-      .scoreboard-divider {
-        display: none;
+        column-gap: 8px;
       }
 
       .kv {
@@ -1025,6 +1020,7 @@
 
       .viewer {
         padding: 8px;
+        padding-bottom: 0px;
       }
 
       .details-row {
@@ -1044,7 +1040,7 @@
             <input id="urlInput" type="url" placeholder="https://footter.com/match/305458/" value="https://footter.com/match/305458/">
             <button id="loadButton" type="button">Открыть матч</button>
           </div>
-          <div class="source-grid hidden">
+          <div class="source-grid hidden_">
             <div>
               <p>Локальный HTML матча или сохранённый HTML с логом</p>
               <input id="pageFileInput" type="file" accept=".html,text/html">
@@ -1068,31 +1064,30 @@
     <section class="app-shell">
       <div class="viewer">
         <div class="field-panel">
-          <section class="panel" style="margin-bottom:10px;width:100%;">
+          <section class="panel">
             <div class="meta" style="width:100%;">
               <div class="meta-card" style="width:100%;">
                 <div class="match-bar">
                   <span id="teamsLabel">-</span>
                   <span id="matchMinute" class="match-minute">-</span>
+                  <div class="timeline">
+                    <button id="prevButton" class="ghost" type="button" disabled>&larr;</button>
+                    <button id="playButton" class="secondary" type="button" disabled>Play</button>
+                    <button id="nextButton" class="ghost" type="button" disabled>&rarr;</button>
+                    <select id="speedSelect" aria-label="Скорость">
+                      <option value="6000">x0.5</option>
+                      <option value="4000">x0.75</option>
+                      <option value="3000" selected>x1</option>
+                      <option value="2000">x1.5</option>
+                      <option value="1000">x3</option>
+                    </select>
+                    <input id="timelineRange" type="range" min="0" max="0" value="0" disabled>
+                    <div class="timeline-counter">
+                      <button class="timeline-label" id="timelineLabel" type="button" disabled aria-label="Лента событий недоступна">0 / 0</button>
+                      <button class="timeline-info-button" id="episodeInfoButton" type="button" disabled aria-label="Текущий эпизод недоступен">i</button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            <div class="timeline" style="margin-top:12px;">
-              <button id="prevButton" class="ghost" type="button" disabled>&larr;</button>
-              <button id="playButton" class="secondary" type="button" disabled>Play</button>
-              <button id="nextButton" class="ghost" type="button" disabled>&rarr;</button>
-              <select id="speedSelect" aria-label="Скорость">
-                <option value="6000">x0.5</option>
-                <option value="4000">x0.75</option>
-                <option value="3000" selected>x1</option>
-                <option value="2000">x1.5</option>
-                <option value="1000">x3</option>
-              </select>
-              <input id="timelineRange" type="range" min="0" max="0" value="0" disabled>
-              <div class="timeline-counter">
-                <button class="timeline-label" id="timelineLabel" type="button" disabled aria-label="Лента событий недоступна">0 / 0</button>
-                <button class="timeline-info-button" id="episodeInfoButton" type="button" disabled aria-label="Текущий эпизод недоступен">i</button>
               </div>
             </div>
           </section>
@@ -1110,8 +1105,10 @@
           </div>
           <div class="side-panel">
             <div class="details-row">
-              <section id="currentLogCard" class="current-log-card">
-                <div id="currentLogText" class="current-log-text">После загрузки здесь появится текст текущего события.</div>
+              <section class="panel" style="border-radius: 0 0 17px 17px; padding-bottom: 2px; padding-top: 0;">
+                <section id="currentLogCard" class="current-log-card">
+                  <div id="currentLogText" class="current-log-text">После загрузки здесь появится текст текущего события.</div>
+              </section>
             </section>
           </div>
         </div>
@@ -2698,8 +2695,8 @@
         ? `
           <span class="scoreboard">
             <span class="scoreboard-team home">
-              <span class="scoreboard-name team-home">${home}</span>
               <span class="scoreboard-score">${state.score[0] ?? 0}</span>
+              <span class="scoreboard-name team-home">${home}</span>
             </span>
             <span class="scoreboard-divider">:</span>
             <span class="scoreboard-team away">
