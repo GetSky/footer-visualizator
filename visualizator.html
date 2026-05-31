@@ -242,7 +242,7 @@
     .viewer {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 18px;
+      gap: 0;
       min-height: 100svh;
       padding: 14px;
       max-width: 1000px;
@@ -537,7 +537,7 @@
 
     .timeline {
       display: grid;
-      grid-template-columns: 64px 96px 64px 96px auto 96px;
+      grid-template-columns: 64px 96px 64px 96px minmax(140px, 1fr) max-content;
       gap: 10px;
       align-items: center;
     }
@@ -547,12 +547,63 @@
       accent-color: var(--accent);
     }
 
-    .timeline-label {
-      color: var(--muted);
-      font-size: 14px;
-      padding-right: 12px;
-      text-align: right;
+    .timeline-counter {
+      display: inline-flex;
+      align-items: center;
+      justify-self: end;
+      gap: 8px;
       white-space: nowrap;
+    }
+
+    .timeline-label {
+      appearance: none;
+      min-width: 66px;
+      border: 1px solid #d7c2a1;
+      border-radius: 999px;
+      background: #f7f0e3;
+      color: var(--accent-2);
+      cursor: pointer;
+      font: 800 14px/1 "Source Code Pro", monospace;
+      padding: 7px 11px;
+      text-align: center;
+    }
+
+    .timeline-label:not(:disabled):hover,
+    .timeline-label:not(:disabled):focus-visible {
+      background: #f7f0e3;
+      border-color: #d7c2a1;
+      color: var(--ink);
+      outline: none;
+    }
+
+    .timeline-label:disabled {
+      cursor: default;
+      opacity: 0.62;
+    }
+
+    .timeline-info-button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #d7c2a1;
+      border-radius: 999px;
+      background: #f7f0e3;
+      color: var(--accent-2);
+      cursor: pointer;
+      font: 800 14px/1 "Source Code Pro", monospace;
+      padding: 0;
+    }
+
+    .timeline-info-button:not(:disabled):hover,
+    .timeline-info-button:not(:disabled):focus-visible {
+      background: #f7f0e3;
+      border-color: #d7c2a1;
+      color: var(--ink);
+      outline: none;
+    }
+
+    .timeline-info-button:disabled {
+      cursor: default;
+      opacity: 0.62;
     }
 
     .side-panel {
@@ -560,12 +611,12 @@
       grid-template-columns: 1fr;
       gap: 18px;
       align-content: start;
-      overflow: visible;
+      width: 100%;
     }
 
     .details-row {
       display: grid;
-      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      grid-template-columns: 1fr;
       gap: 18px;
       align-items: start;
     }
@@ -580,6 +631,67 @@
       border: 1px solid #d7c2a1;
       border-radius: 16px;
       padding: 16px;
+    }
+
+    .episode-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(34, 32, 28, 0.48);
+      backdrop-filter: blur(3px);
+    }
+
+    .episode-modal-backdrop.open {
+      display: grid;
+    }
+
+    .episode-modal {
+      width: min(560px, 100%);
+      max-height: min(86vh, 720px);
+      overflow: auto;
+      box-shadow: 0 24px 80px rgba(28, 24, 18, 0.34);
+    }
+
+    .episode-modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .episode-modal-head .card-title {
+      margin: 0;
+    }
+
+    .episode-modal-close {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid #d7c2a1;
+      background: #fff8ea;
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 22px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .episode-modal-close:hover,
+    .episode-modal-close:focus-visible {
+      background: #f0dfca;
+      outline: none;
+    }
+
+    .event-list-modal {
+      width: min(720px, 100%);
+    }
+
+    .event-list-modal .event-list {
+      max-height: min(66vh, 620px);
     }
 
     .event-main {
@@ -862,13 +974,12 @@
         grid-column: 1 / 4;
       }
 
-      .timeline-label {
+      .timeline-counter {
         grid-column: 4 / 5;
       }
 
-      .timeline-label {
-        padding-right: 0;
-        text-align: right;
+      .timeline-counter {
+        justify-self: end;
       }
 
       .match-bar {
@@ -979,7 +1090,10 @@
                 <option value="1000">x3</option>
               </select>
               <input id="timelineRange" type="range" min="0" max="0" value="0" disabled>
-              <div class="timeline-label" id="timelineLabel">0 / 0</div>
+              <div class="timeline-counter">
+                <button class="timeline-label" id="timelineLabel" type="button" disabled aria-label="Лента событий недоступна">0 / 0</button>
+                <button class="timeline-info-button" id="episodeInfoButton" type="button" disabled aria-label="Текущий эпизод недоступен">i</button>
+              </div>
             </div>
           </section>
 
@@ -994,46 +1108,55 @@
             <div class="trail-layer" id="trailLayer"></div>
             <div class="marker-layer" id="markerLayer"></div>
           </div>
-        </div>
-
-        <div class="side-panel">
-          <div class="details-row">
-            <section id="currentLogCard" class="current-log-card">
-              <div id="currentLogText" class="current-log-text">После загрузки здесь появится текст текущего события.</div>
-            </section>
-
-            <section class="event-card">
-              <h2 class="card-title">Текущий эпизод</h2>
-              <div class="event-main">
-                <div>
-                  <small id="eventClock">Минута -</small>
-                  <strong id="eventAction">Нет данных</strong>
-                </div>
-                <span class="pill" id="eventResult">-</span>
-              </div>
-              <dl class="kv">
-                <dt>Команда</dt>
-                <dd id="eventTeam">-</dd>
-                <dt>С мячом</dt>
-                <dd id="eventBallPlayer">-</dd>
-                <dt>Цель</dt>
-                <dd id="eventTarget">-</dd>
-                <dt>Соперник</dt>
-                <dd id="eventOpponent">-</dd>
-                <dt>Координаты</dt>
-                <dd id="eventCoords">-</dd>
-              </dl>
+          <div class="side-panel">
+            <div class="details-row">
+              <section id="currentLogCard" class="current-log-card">
+                <div id="currentLogText" class="current-log-text">После загрузки здесь появится текст текущего события.</div>
             </section>
           </div>
-
-          <section class="event-card">
-            <h2 class="card-title">Лента событий</h2>
-            <div class="event-list" id="eventList"></div>
-          </section>
+        </div>
         </div>
       </div>
     </section>
   </main>
+
+  <div id="episodeModalBackdrop" class="episode-modal-backdrop" aria-hidden="true">
+    <section class="event-card episode-modal" role="dialog" aria-modal="true" aria-labelledby="episodeModalTitle">
+      <div class="episode-modal-head">
+        <h2 class="card-title" id="episodeModalTitle">Текущий эпизод</h2>
+        <button id="episodeModalClose" class="episode-modal-close" type="button" aria-label="Закрыть текущий эпизод">&times;</button>
+      </div>
+      <div class="event-main">
+        <div>
+          <small id="eventClock">Минута -</small>
+          <strong id="eventAction">Нет данных</strong>
+        </div>
+        <span class="pill" id="eventResult">-</span>
+      </div>
+      <dl class="kv">
+        <dt>Команда</dt>
+        <dd id="eventTeam">-</dd>
+        <dt>С мячом</dt>
+        <dd id="eventBallPlayer">-</dd>
+        <dt>Цель</dt>
+        <dd id="eventTarget">-</dd>
+        <dt>Соперник</dt>
+        <dd id="eventOpponent">-</dd>
+        <dt>Координаты</dt>
+        <dd id="eventCoords">-</dd>
+      </dl>
+    </section>
+  </div>
+
+  <div id="eventListModalBackdrop" class="episode-modal-backdrop" aria-hidden="true">
+    <section class="event-card episode-modal event-list-modal" role="dialog" aria-modal="true" aria-labelledby="eventListModalTitle">
+      <div class="episode-modal-head">
+        <h2 class="card-title" id="eventListModalTitle">Лента событий</h2>
+        <button id="eventListModalClose" class="episode-modal-close" type="button" aria-label="Закрыть ленту событий">&times;</button>
+      </div>
+      <div class="event-list" id="eventList"></div>
+    </section>
+  </div>
 
   <script>
     const FIELD_ROWS = 14;
@@ -1065,6 +1188,11 @@
     const speedSelect = document.getElementById("speedSelect");
     const timelineRange = document.getElementById("timelineRange");
     const timelineLabel = document.getElementById("timelineLabel");
+    const episodeInfoButton = document.getElementById("episodeInfoButton");
+    const episodeModalBackdrop = document.getElementById("episodeModalBackdrop");
+    const episodeModalClose = document.getElementById("episodeModalClose");
+    const eventListModalBackdrop = document.getElementById("eventListModalBackdrop");
+    const eventListModalClose = document.getElementById("eventListModalClose");
     const teamsLabel = document.getElementById("teamsLabel");
     const matchMinute = document.getElementById("matchMinute");
     const fieldPanel = document.querySelector(".field-panel");
@@ -1103,6 +1231,8 @@
 
     let fieldResizeObserver = null;
     let progressSteps = [];
+    let episodeModalPreviouslyFocused = null;
+    let eventListModalPreviouslyFocused = null;
 
     function setStatus(message, isError) {
       statusNode.textContent = message;
@@ -2359,6 +2489,56 @@
       return String(rawHtml || "").replace(/^\s*\[[^\[\]]+\]\s*/, "");
     }
 
+    function openEpisodeModal() {
+      if (!state.snapshots.length) {
+        return;
+      }
+
+      episodeModalPreviouslyFocused = document.activeElement;
+      episodeModalBackdrop.classList.add("open");
+      episodeModalBackdrop.setAttribute("aria-hidden", "false");
+      episodeModalClose.focus();
+    }
+
+    function closeEpisodeModal() {
+      if (!episodeModalBackdrop.classList.contains("open")) {
+        return;
+      }
+
+      episodeModalBackdrop.classList.remove("open");
+      episodeModalBackdrop.setAttribute("aria-hidden", "true");
+
+      if (episodeModalPreviouslyFocused && typeof episodeModalPreviouslyFocused.focus === "function") {
+        episodeModalPreviouslyFocused.focus();
+      }
+      episodeModalPreviouslyFocused = null;
+    }
+
+    function openEventListModal() {
+      if (!state.events.length) {
+        return;
+      }
+
+      eventListModalPreviouslyFocused = document.activeElement;
+      eventListModalBackdrop.classList.add("open");
+      eventListModalBackdrop.setAttribute("aria-hidden", "false");
+      eventListModalClose.focus();
+    }
+
+    function closeEventListModal() {
+      if (!eventListModalBackdrop.classList.contains("open")) {
+        return;
+      }
+
+      eventListModalBackdrop.classList.remove("open");
+      eventListModalBackdrop.setAttribute("aria-hidden", "true");
+
+      if (eventListModalPreviouslyFocused && typeof eventListModalPreviouslyFocused.focus === "function") {
+        eventListModalPreviouslyFocused.focus();
+      }
+      eventListModalPreviouslyFocused = null;
+    }
+
     function renderEventCard(snapshot) {
       if (!snapshot) {
         eventClock.textContent = "Минута -";
@@ -2418,6 +2598,14 @@
       prevButton.disabled = !hasEvents || state.currentIndex <= 0;
       nextButton.disabled = !hasEvents || state.currentIndex >= lastIndex;
       timelineRange.disabled = !hasEvents;
+      timelineLabel.disabled = !hasEvents;
+      timelineLabel.title = hasEvents ? "Открыть ленту событий" : "";
+      episodeInfoButton.disabled = !hasEvents;
+      episodeInfoButton.title = hasEvents ? "Открыть текущий эпизод" : "";
+      if (!hasEvents) {
+        timelineLabel.setAttribute("aria-label", "Лента событий недоступна");
+        episodeInfoButton.setAttribute("aria-label", "Текущий эпизод недоступен");
+      }
     }
 
     function setCurrentIndex(index) {
@@ -2428,6 +2616,8 @@
       state.score = buildScoreUntilIndex(state.events, state.teams, state.currentIndex + 1);
       timelineRange.value = String(state.currentIndex);
       timelineLabel.textContent = `${state.currentIndex + 1} / ${state.snapshots.length}`;
+      timelineLabel.setAttribute("aria-label", `Открыть ленту событий, выбран эпизод ${state.currentIndex + 1} из ${state.snapshots.length}`);
+      episodeInfoButton.setAttribute("aria-label", `Открыть текущий эпизод ${state.currentIndex + 1} из ${state.snapshots.length}`);
       fillSummary();
       renderActionLine(currentSnapshot, nextSnapshot);
       renderMarkers(currentSnapshot, nextSnapshot);
@@ -2568,6 +2758,8 @@
       }
 
       stopPlayback();
+      closeEpisodeModal();
+      closeEventListModal();
       setStatus("Загрузка страницы...");
       teamsLabel.innerHTML = "-";
       matchMinute.textContent = "-";
@@ -2693,6 +2885,26 @@
     urlInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         parseMatchPage();
+      }
+    });
+    timelineLabel.addEventListener("click", openEventListModal);
+    episodeInfoButton.addEventListener("click", openEpisodeModal);
+    episodeModalClose.addEventListener("click", closeEpisodeModal);
+    episodeModalBackdrop.addEventListener("click", (event) => {
+      if (event.target === episodeModalBackdrop) {
+        closeEpisodeModal();
+      }
+    });
+    eventListModalClose.addEventListener("click", closeEventListModal);
+    eventListModalBackdrop.addEventListener("click", (event) => {
+      if (event.target === eventListModalBackdrop) {
+        closeEventListModal();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeEpisodeModal();
+        closeEventListModal();
       }
     });
 
