@@ -18,8 +18,8 @@
       --accent-2: #184f43;
       --field: #2d8a4d;
       --field-dark: #267643;
-      --home: #d45500;
-      --away: #17394a;
+      --home: #c8102e;
+      --away: #111111;
       --danger: #9f1f1f;
       --marker-size: 44px;
       --marker-font-size: 12px;
@@ -288,13 +288,13 @@
     }
 
     .current-log-card.home {
-      background: #f1d8c7;
-      border-color: #d79f7b;
+      background: #fff1f3;
+      border-color: #c8102e;
     }
 
     .current-log-card.away {
-      background: #d7e5eb;
-      border-color: #8eafb9;
+      background: #fff3b0;
+      border-color: #111111;
     }
 
     .current-log-title {
@@ -456,11 +456,15 @@
     }
 
     .player-marker.home {
-      background: radial-gradient(circle at 35% 30%, #ffb066, var(--home));
+      background:
+        linear-gradient(90deg, #ffffff 0 18%, transparent 18% 82%, #ffffff 82% 100%),
+        var(--home);
     }
 
     .player-marker.away {
-      background: radial-gradient(circle at 35% 30%, #62c0c7, var(--away));
+      background:
+        linear-gradient(90deg, #f7c600 0 18%, transparent 18% 82%, #f7c600 82% 100%),
+        var(--away);
     }
 
     .player-marker.active {
@@ -507,7 +511,7 @@
     }
 
     .player-marker.failed-target {
-      border-style: dashed;
+      border-color: rgba(255, 133, 133, 0.98);
     }
 
     .player-tag.danger-tag {
