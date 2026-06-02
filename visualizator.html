@@ -311,6 +311,8 @@
 
     .pitch-line,
     .pitch-circle,
+    .pitch-arc,
+    .pitch-spot,
     .pitch-box,
     .pitch-goal,
     .pitch-grid,
@@ -335,6 +337,44 @@
       border-radius: 50%;
       border: 2px solid rgba(255,255,255,0.8);
       transform: translate(-50%, -50%);
+    }
+
+    .pitch-arc {
+      top: 50%;
+      width: 17.5%;
+      aspect-ratio: 1;
+      border: 2px solid rgba(255,255,255,0.8);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translateY(-50%);
+    }
+
+    .pitch-arc.left {
+      left: 1.75%;
+      clip-path: inset(0 0 0 81.4%);
+    }
+
+    .pitch-arc.right {
+      right: 1.75%;
+      clip-path: inset(0 81.4% 0 0);
+    }
+
+    .pitch-spot {
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .pitch-spot.left {
+      left: 10.5%;
+    }
+
+    .pitch-spot.right {
+      left: 89.5%;
     }
 
     .pitch-box {
@@ -1114,8 +1154,12 @@
             <div class="pitch-line mid"></div>
             <div class="pitch-circle"></div>
             <div class="pitch-box top"></div>
+            <div class="pitch-arc left"></div>
+            <div class="pitch-spot left"></div>
             <div class="pitch-box top small"></div>
             <div class="pitch-box bottom"></div>
+            <div class="pitch-arc right"></div>
+            <div class="pitch-spot right"></div>
             <div class="pitch-box bottom small"></div>
             <div class="trail-layer" id="trailLayer"></div>
             <div class="marker-layer" id="markerLayer"></div>
