@@ -526,6 +526,13 @@
         0 0 0 8px rgba(246, 190, 64, 0.18);
     }
 
+    .player-marker.goalkeeper {
+      border-color: rgba(90, 190, 255, 0.98);
+      box-shadow:
+        0 10px 20px rgba(0,0,0,0.18),
+        0 0 0 8px rgba(90, 190, 255, 0.18);
+    }
+
     .player-tag.danger-tag {
       color: #ffd6d6;
     }
@@ -2072,6 +2079,56 @@
       return normalizeText(event && event.mixed_action).toLowerCase().includes("cornerkick_naves_shot");
     }
 
+    function getShotGoalPoint(teamName) {
+      const isAway = getTeamSide(normalizeText(teamName)) === "away";
+      return [isAway ? 1 : FIELD_ROWS, (FIELD_COLS + 1) / 2];
+    }
+
+    function getShotGoalkeeperMarker(snapshot) {
+      if (!snapshot || !snapshot.event || !isShotAction(getSnapshotAction(snapshot))) {
+        return null;
+      }
+
+      const shotTeam = normalizeText(snapshot.event.team);
+      const goalkeeperTeam = getOtherTeam(shotTeam);
+      const point = getShotGoalPoint(shotTeam);
+      const goalkeeper = parsePlayerValue(snapshot.event.opponent) || {
+        id: `goalkeeper:${goalkeeperTeam || "defense"}`,
+        name: "Вратарь",
+        label: "Вратарь"
+      };
+
+      return {
+        ...makePlayerState(
+          goalkeeper,
+          goalkeeperTeam,
+          point[0],
+          point[1],
+          "goalkeeper",
+          snapshot.event.index,
+          goalkeeperTeam
+        ),
+        markerLabel: getPlayerMarkerLabel(goalkeeper) || "GK",
+        markerId: `goalkeeper:${snapshot.event.index}:${goalkeeper.id || goalkeeper.name}`,
+        markerPhase: "overlay",
+        isGoalkeeper: true
+      };
+    }
+
+    function isNextShotGoalkeeperPlayer(currentSnapshot, nextSnapshot, player) {
+      if (!currentSnapshot || !nextSnapshot || !isShotAction(getSnapshotAction(currentSnapshot))) {
+        return false;
+      }
+
+      const goalkeeper = parsePlayerValue(currentSnapshot.event.opponent);
+      const nextActor = parsePlayerValue(nextSnapshot.event.player_with_ball);
+      if (!goalkeeper || !nextActor || !samePlayer(goalkeeper, nextActor)) {
+        return false;
+      }
+
+      return samePlayer(goalkeeper, player);
+    }
+
     function resolvePlayerById(playerId, snapshot) {
       const id = parsePlayerIdReference(playerId);
       if (!id) {
@@ -2628,6 +2685,11 @@
         entries.push(cornerPasser);
       }
 
+      const shotGoalkeeper = !isFoulFrame ? getShotGoalkeeperMarker(currentSnapshot) : null;
+      if (shotGoalkeeper) {
+        entries.push(shotGoalkeeper);
+      }
+
       const shouldRenderNextSnapshotPlayers = nextSnapshot
         && !isFoulFrame
         && currentAction !== "розыгрыш"
@@ -2636,6 +2698,10 @@
 
       if (shouldRenderNextSnapshotPlayers) {
         Object.values(nextSnapshot.players).forEach((player) => {
+          if (isNextShotGoalkeeperPlayer(currentSnapshot, nextSnapshot, player)) {
+            return;
+          }
+
           entries.push({
             ...player,
             markerId: `next:${player.id}`,
@@ -2725,7 +2791,7 @@
         const stack = stackMap.get(`${player.row}:${player.col}`) || [player];
         const stackIndex = stack.findIndex((item) => item.markerId === playerId);
         const verticalOffset = (stackIndex - ((stack.length - 1) / 2)) * 50;
-        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""}`;
+        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""} ${player.isGoalkeeper ? "goalkeeper" : ""}`;
         marker.style.left = `${pos.x}%`;
         marker.style.top = `calc(${pos.y}% + ${verticalOffset}px)`;
         marker.style.zIndex = (player.isIncomingOpponent || player.isPassTarget)
