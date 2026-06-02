@@ -422,6 +422,12 @@
       background: linear-gradient(90deg, rgba(208, 64, 64, 0.95), rgba(208, 64, 64, 0.3));
     }
 
+    .pass-line.mixed-pass {
+      height: 4px;
+      background: linear-gradient(90deg, rgba(246, 190, 64, 0.96), rgba(246, 190, 64, 0.28));
+      z-index: 9;
+    }
+
     .player-marker {
       position: absolute;
       width: var(--marker-size);
@@ -511,6 +517,13 @@
 
     .player-marker.failed-target {
       border-color: rgba(255, 133, 133, 0.98);
+    }
+
+    .player-marker.corner-passer {
+      border-color: rgba(246, 190, 64, 0.98);
+      box-shadow:
+        0 10px 20px rgba(0,0,0,0.18),
+        0 0 0 8px rgba(246, 190, 64, 0.18);
     }
 
     .player-tag.danger-tag {
@@ -1170,7 +1183,10 @@
       "принимающий": "target",
       "коорд": "position",
       "результат": "result",
-      "соперник": "opponent"
+      "соперник": "opponent",
+      "mixed_action": "mixed_action",
+      "prev_pm": "prev_pm",
+      "prev_pass": "prev_pass"
     };
 
     const urlInput = document.getElementById("urlInput");
@@ -1217,6 +1233,7 @@
       teams: [],
       score: [0, 0],
       teamByPlayerId: {},
+      playerById: {},
       playerPositionById: {},
       snapshots: [],
       currentIndex: 0,
@@ -1375,6 +1392,26 @@
       };
     }
 
+    function parsePlayerIdReference(raw) {
+      const value = normalizeText(raw);
+      if (!value || value === "None") {
+        return "";
+      }
+
+      const match = value.match(/\d+/);
+      return match ? match[0] : "";
+    }
+
+    function parseNamedIdReference(raw, key) {
+      const value = normalizeText(raw);
+      if (!value) {
+        return "";
+      }
+
+      const match = value.match(new RegExp(`${key}\\s*:\\s*(\\d+)`));
+      return match ? match[1] : "";
+    }
+
     function parsePositionValue(raw) {
       const value = normalizeText(raw);
       if (!value) {
@@ -1391,6 +1428,20 @@
 
       const matches = [...value.matchAll(/\[(\d+)\s*,\s*(\d+)\]/g)];
       return matches.map((match) => [Number(match[1]), Number(match[2])]);
+    }
+
+    function parsePrevPassValue(raw) {
+      const value = normalizeText(raw);
+      if (!value) {
+        return { pm: "", coords: [] };
+      }
+
+      const pmMatch = value.match(/['"]?pm['"]?\s*:\s*(\d+)/);
+      const coordMatch = value.match(/['"]?coord['"]?\s*:\s*(\[\s*\[[^\]]+\]\s*,\s*\[[^\]]+\]\s*\])/);
+      return {
+        pm: pmMatch ? pmMatch[1] : "",
+        coords: coordMatch ? parsePositionValue(coordMatch[1]) : []
+      };
     }
 
     function coerceValue(key, raw) {
@@ -1436,10 +1487,6 @@
         const rawValue = normalizeText(match[2]);
         let key = slugifyKey(rawKey, `line_${lineIndex + 1}`);
         key = divhistKeyMap[key] || key;
-
-        if (key === "prev_pass") {
-          return;
-        }
 
         if (Object.prototype.hasOwnProperty.call(event, key)) {
           key = `${key}_${lineIndex + 1}`;
@@ -1616,6 +1663,20 @@
       ].filter(Boolean);
     }
 
+    function buildPlayerInfoById(events) {
+      const map = {};
+
+      events.forEach((event) => {
+        collectEventPlayers(event).forEach((player) => {
+          if (player.id && !map[player.id]) {
+            map[player.id] = player;
+          }
+        });
+      });
+
+      return map;
+    }
+
     function buildPlayerPositionById(events, positionByPlayerName) {
       const map = {};
 
@@ -1789,8 +1850,17 @@
       return teamIndex === 1 ? [2, 2.5] : [13, 2.5];
     }
 
+    function clonePlayersById(playersById) {
+      const clone = {};
+      Object.keys(playersById).forEach((playerId) => {
+        clone[playerId] = { ...playersById[playerId] };
+      });
+      return clone;
+    }
+
     function buildSnapshots(events, teams, teamByPlayerId) {
       const snapshots = [];
+      const knownPlayersById = {};
 
       const defaultTeams = {
         home: teams[0] || "Команда 1",
@@ -1812,6 +1882,7 @@
         const nextEvent = events[index + 1] || null;
         const nextLocalPoint = nextEvent ? getEventPoint(nextEvent) : null;
         const kickoffPoint = toGlobalCoord(nextLocalPoint, team, teams);
+        const coordsPair = getCoordsPair(event);
         const currentPoint = isKickoff
           ? (kickoffPoint || KICKOFF_POINT)
           : (
@@ -1819,14 +1890,31 @@
               ? getPenaltySpot(team, teams)
               : (toGlobalCoord(localPoint, team, teams) || START_COORD_FALLBACK)
           );
+        const previousPlayersById = clonePlayersById(knownPlayersById);
 
         if (actor) {
-          framePlayers[actor.id || `actor_${event.index}`] = makePlayerState(actor, actorTeam, currentPoint[0], currentPoint[1], "ball", event.index, defaultTeams.home);
+          const actorState = makePlayerState(actor, actorTeam, currentPoint[0], currentPoint[1], "ball", event.index, defaultTeams.home);
+          framePlayers[actor.id || `actor_${event.index}`] = actorState;
+          if (actor.id) {
+            knownPlayersById[actor.id] = actorState;
+          }
+        }
+
+        if (target && target.id && coordsPair.to && isPassAction(action)) {
+          const targetTeam = teamByPlayerId[target.id] || team;
+          knownPlayersById[target.id] = makePlayerState(target, targetTeam, coordsPair.to[0], coordsPair.to[1], "target", event.index, targetTeam);
+        }
+
+        if (opponent && opponent.id && coordsPair.to && isFailedPassResult(event.result)) {
+          const opponentTeam = teamByPlayerId[opponent.id] || getOtherTeam(team);
+          knownPlayersById[opponent.id] = makePlayerState(opponent, opponentTeam, coordsPair.to[0], coordsPair.to[1], "opponent", event.index, opponentTeam);
         }
 
         snapshots.push({
           event,
           players: framePlayers,
+          playersById: clonePlayersById(knownPlayersById),
+          previousPlayersById,
           focusPoint: currentPoint
         });
       }
@@ -1978,6 +2066,102 @@
 
     function getOtherTeam(teamName) {
       return state.teams.find((item) => item !== teamName) || teamName;
+    }
+
+    function isCornerKickNavesShotEvent(event) {
+      return normalizeText(event && event.mixed_action).toLowerCase().includes("cornerkick_naves_shot");
+    }
+
+    function resolvePlayerById(playerId, snapshot) {
+      const id = parsePlayerIdReference(playerId);
+      if (!id) {
+        return null;
+      }
+
+      const previousState = snapshot && snapshot.previousPlayersById ? snapshot.previousPlayersById[id] : null;
+      const currentState = snapshot && snapshot.playersById ? snapshot.playersById[id] : null;
+      const playerInfo = state.playerById[id];
+      const playerState = previousState || currentState;
+      if (playerState) {
+        return {
+          id,
+          name: playerState.name,
+          label: `${id} ${playerState.name}`
+        };
+      }
+
+      if (playerInfo) {
+        return playerInfo;
+      }
+
+      return {
+        id,
+        name: `ID ${id}`,
+        label: id
+      };
+    }
+
+    function getCornerKickPasserPoint(snapshot) {
+      const shotPoint = snapshot && snapshot.focusPoint ? snapshot.focusPoint : START_COORD_FALLBACK;
+      return [
+        1,
+        shotPoint[1] >= 3 ? 4 : 1
+      ];
+    }
+
+    function getCornerKickPassInfo(snapshot) {
+      if (!snapshot || !isCornerKickNavesShotEvent(snapshot.event)) {
+        return null;
+      }
+
+      const prevPass = parsePrevPassValue(snapshot.event.prev_pass);
+      const passerId = parsePlayerIdReference(snapshot.event.prev_pm)
+        || prevPass.pm
+        || parseNamedIdReference(snapshot.event.mixed_action, "prev_pm")
+        || parseNamedIdReference(snapshot.event.raw_text, "prev_pm");
+      const previousState = passerId && snapshot.previousPlayersById ? snapshot.previousPlayersById[passerId] : null;
+      const fromPoint = getCornerKickPasserPoint(snapshot);
+      const toPoint = snapshot.focusPoint || (
+        prevPass.coords[1]
+          ? clampCoord(prevPass.coords[1][0], prevPass.coords[1][1])
+          : null
+      );
+      const passer = resolvePlayerById(passerId, snapshot);
+
+      if (!fromPoint || !toPoint || !passer) {
+        return null;
+      }
+
+      return {
+        fromPoint,
+        toPoint,
+        passer,
+        team: previousState && previousState.team
+          ? previousState.team
+          : (state.teamByPlayerId[passer.id] || normalizeText(snapshot.event.team))
+      };
+    }
+
+    function getCornerKickPasserMarker(snapshot) {
+      const passInfo = getCornerKickPassInfo(snapshot);
+      if (!passInfo) {
+        return null;
+      }
+
+      return {
+        ...makePlayerState(
+          passInfo.passer,
+          passInfo.team,
+          passInfo.fromPoint[0],
+          passInfo.fromPoint[1],
+          "corner-passer",
+          snapshot.event.index,
+          passInfo.team
+        ),
+        markerId: `corner-passer:${snapshot.event.index}:${passInfo.passer.id || passInfo.passer.name}`,
+        markerPhase: "overlay",
+        isCornerPasser: true
+      };
     }
 
     function isPassFollowedByFoul(currentSnapshot, nextSnapshot) {
@@ -2241,18 +2425,7 @@
       return buildScore(events.slice(0, Math.max(0, endExclusive)), teams);
     }
 
-    function renderActionLine(currentSnapshot, nextSnapshot) {
-      trailLayer.innerHTML = "";
-      if (!currentSnapshot) {
-        return;
-      }
-
-      const action = String((currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
-      if (!isPassAction(action) && !isShotAction(action)) {
-        return;
-      }
-
-      const fromPoint = currentSnapshot.focusPoint;
+    function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "") {
       if (!fromPoint) {
         return;
       }
@@ -2261,28 +2434,83 @@
       const fieldRect = field.getBoundingClientRect();
       const fromX = (from.x / 100) * fieldRect.width;
       const fromY = (from.y / 100) * fieldRect.height;
-      let toX = fromX;
-      let toY = fromY;
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      if (!Number.isFinite(length) || length <= 1) {
+        return;
+      }
+
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      const line = document.createElement("div");
+      line.className = `pass-line ${isFailed ? "fail" : "success"} ${extraClass}`.trim();
+      line.style.left = `${fromX}px`;
+      line.style.top = `${fromY}px`;
+      line.style.width = `${length}px`;
+      line.style.setProperty("--pass-angle", `${angle}deg`);
+      trailLayer.appendChild(line);
+    }
+
+    function appendActionLine(fromPoint, toPoint, isFailed, extraClass = "") {
+      if (!toPoint) {
+        return;
+      }
+
+      const to = coordToPercent(toPoint[0], toPoint[1]);
+      const fieldRect = field.getBoundingClientRect();
+      appendActionLineToPixel(
+        fromPoint,
+        (to.x / 100) * fieldRect.width,
+        (to.y / 100) * fieldRect.height,
+        isFailed,
+        extraClass
+      );
+    }
+
+    function renderActionLine(currentSnapshot, nextSnapshot) {
+      trailLayer.innerHTML = "";
+      if (!currentSnapshot) {
+        return;
+      }
+
+      const action = String((currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
+      if (!isPassAction(action) && !isShotAction(action) && !isCornerKickNavesShotEvent(currentSnapshot.event)) {
+        return;
+      }
+
+      const fromPoint = currentSnapshot.focusPoint;
+      if (!fromPoint) {
+        return;
+      }
+
+      const cornerPassInfo = getCornerKickPassInfo(currentSnapshot);
+      if (cornerPassInfo) {
+        appendActionLine(cornerPassInfo.fromPoint, cornerPassInfo.toPoint, false, "mixed-pass");
+      }
+
+      let toPoint = null;
 
       if (isPassAction(action)) {
         const targetPoint = getPassRenderTargetPoint(currentSnapshot, nextSnapshot);
         if (!targetPoint) {
           return;
         }
-        const to = coordToPercent(targetPoint[0], targetPoint[1]);
-        toX = (to.x / 100) * fieldRect.width;
-        toY = (to.y / 100) * fieldRect.height;
+        toPoint = targetPoint;
       } else if (isShotAction(action)) {
         const teamName = normalizeText(currentSnapshot.event.team);
         const isAway = getTeamSide(teamName) === "away";
-        toX = isAway ? 0 : fieldRect.width;
-        toY = fieldRect.height / 2;
+        const fieldRect = field.getBoundingClientRect();
+        const goalX = isAway ? 0 : fieldRect.width;
+        const goalY = fieldRect.height / 2;
+        const isFailed = !(
+          currentSnapshot.event.result === 1
+          || currentSnapshot.event.result === true
+          || currentSnapshot.event.result === "1"
+        );
+        appendActionLineToPixel(fromPoint, goalX, goalY, isFailed);
+        return;
       }
 
-      const dx = toX - fromX;
-      const dy = toY - fromY;
-      const length = Math.sqrt(dx * dx + dy * dy);
-      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
       const isFailed = isPassAction(action)
         ? isFailedPassResult(currentSnapshot.event.result)
         : !(
@@ -2291,13 +2519,7 @@
           || currentSnapshot.event.result === "1"
         );
 
-      const line = document.createElement("div");
-      line.className = `pass-line ${isFailed ? "fail" : "success"}`;
-      line.style.left = `${fromX}px`;
-      line.style.top = `${fromY}px`;
-      line.style.width = `${length}px`;
-      line.style.setProperty("--pass-angle", `${angle}deg`);
-      trailLayer.appendChild(line);
+      appendActionLine(fromPoint, toPoint, isFailed);
     }
 
     function renderMarkers(currentSnapshot, nextSnapshot) {
@@ -2343,6 +2565,11 @@
             markerPhase: "current"
           });
         });
+      }
+
+      const cornerPasser = !isFoulFrame ? getCornerKickPasserMarker(currentSnapshot) : null;
+      if (cornerPasser) {
+        entries.push(cornerPasser);
       }
 
       const shouldRenderNextSnapshotPlayers = nextSnapshot
@@ -2429,7 +2656,7 @@
         const stack = stackMap.get(`${player.row}:${player.col}`) || [player];
         const stackIndex = stack.findIndex((item) => item.markerId === playerId);
         const verticalOffset = (stackIndex - ((stack.length - 1) / 2)) * 50;
-        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""}`;
+        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""}`;
         marker.style.left = `${pos.x}%`;
         marker.style.top = `calc(${pos.y}% + ${verticalOffset}px)`;
         marker.style.zIndex = (player.isIncomingOpponent || player.isPassTarget)
@@ -2774,6 +3001,7 @@
       state.teams = [];
       state.score = [0, 0];
       state.teamByPlayerId = {};
+      state.playerById = {};
       state.playerPositionById = {};
       state.markerNodes = {};
       renderMarkers(null);
@@ -2837,6 +3065,7 @@
         state.teams = extractTeamsFromMatchDoc(pageDoc || logDoc, events);
         state.score = buildScore(events, state.teams);
         state.teamByPlayerId = inferTeamByPlayer(events, state.teams);
+        state.playerById = buildPlayerInfoById(events);
         state.playerPositionById = buildPlayerPositionById(
           events,
           extractPositionByPlayerName(pageDoc || logDoc)
