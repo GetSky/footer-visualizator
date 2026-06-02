@@ -18,6 +18,8 @@
       --accent-2: #184f43;
       --field: #2d8a4d;
       --field-dark: #267643;
+      --touchline-x: 18px;
+      --touchline-y: 14px;
       --home: #c8102e;
       --away: #111111;
       --danger: #9f1f1f;
@@ -92,7 +94,6 @@
       background: var(--panel);
       border-radius: 17px 17px 0 0;
       padding: 2px;
-      padding-bottom: 0;
     }
 
     .controls {
@@ -264,16 +265,34 @@
       overflow: hidden;
     }
 
+    .field-apron {
+      position: relative;
+      width: 100%;
+      min-height: 0;
+      padding: var(--touchline-y) var(--touchline-x);
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 22% 28%, rgba(255,255,255,0.13) 0 1px, transparent 1px) 0 0 / 20px 18px,
+        radial-gradient(circle at 70% 68%, rgba(17,81,46,0.18) 0 1px, transparent 1px) 7px 9px / 22px 20px,
+        linear-gradient(90deg, #318f52 0 7.14%, #2b7d49 7.14% 14.28%, #318f52 14.28% 21.42%, #2b7d49 21.42% 28.56%, #318f52 28.56% 35.7%, #2b7d49 35.7% 42.84%, #318f52 42.84% 49.98%, #2b7d49 49.98% 57.12%, #318f52 57.12% 64.26%, #2b7d49 64.26% 71.4%, #318f52 71.4% 78.54%, #2b7d49 78.54% 85.68%, #318f52 85.68% 92.82%, #2b7d49 92.82% 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.16),
+        inset 0 0 22px rgba(10,58,31,0.22);
+      margin: 0 auto;
+    }
+
     .field-wrap {
       position: relative;
-      width: min(100%, 1000px);
+      width: 100%;
       min-height: 0;
       border-radius: 0;
       overflow: hidden;
       background:
         linear-gradient(90deg, var(--field) 0 7.14%, var(--field-dark) 7.14% 14.28%, var(--field) 14.28% 21.42%, var(--field-dark) 21.42% 28.56%, var(--field) 28.56% 35.7%, var(--field-dark) 35.7% 42.84%, var(--field) 42.84% 49.98%, var(--field-dark) 49.98% 57.12%, var(--field) 57.12% 64.26%, var(--field-dark) 64.26% 71.4%, var(--field) 71.4% 78.54%, var(--field-dark) 78.54% 85.68%, var(--field) 85.68% 92.82%, var(--field-dark) 92.82% 100%);
       border: 2px solid #f5f1e7;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.15),
+        0 0 0 1px rgba(17,81,46,0.24);
       margin: 0 auto;
     }
 
@@ -1012,6 +1031,8 @@
         --marker-size: 32px;
         --marker-font-size: 10px;
         --marker-tag-font-size: 10px;
+        --touchline-x: 10px;
+        --touchline-y: 8px;
       }
 
       .landing {
@@ -1149,24 +1170,26 @@
             </div>
           </section>
 
-          <div class="field-wrap" id="field">
-            <div class="pitch-grid"></div>
-            <div class="pitch-line mid"></div>
-            <div class="pitch-circle"></div>
-            <div class="pitch-box top"></div>
-            <div class="pitch-arc left"></div>
-            <div class="pitch-spot left"></div>
-            <div class="pitch-box top small"></div>
-            <div class="pitch-box bottom"></div>
-            <div class="pitch-arc right"></div>
-            <div class="pitch-spot right"></div>
-            <div class="pitch-box bottom small"></div>
-            <div class="trail-layer" id="trailLayer"></div>
-            <div class="marker-layer" id="markerLayer"></div>
+          <div class="field-apron">
+            <div class="field-wrap" id="field">
+              <div class="pitch-grid"></div>
+              <div class="pitch-line mid"></div>
+              <div class="pitch-circle"></div>
+              <div class="pitch-box top"></div>
+              <div class="pitch-arc left"></div>
+              <div class="pitch-spot left"></div>
+              <div class="pitch-box top small"></div>
+              <div class="pitch-box bottom"></div>
+              <div class="pitch-arc right"></div>
+              <div class="pitch-spot right"></div>
+              <div class="pitch-box bottom small"></div>
+              <div class="trail-layer" id="trailLayer"></div>
+              <div class="marker-layer" id="markerLayer"></div>
+            </div>
           </div>
           <div class="side-panel">
             <div class="details-row">
-              <section class="panel" style="border-radius: 0 0 17px 17px; padding-bottom: 2px; padding-top: 0;">
+              <section class="panel" style="border-radius: 0 0 17px 17px;">
                 <section id="currentLogCard" class="current-log-card">
                   <div id="currentLogText" class="current-log-text">После загрузки здесь появится текст текущего события.</div>
               </section>
@@ -1258,6 +1281,7 @@
     const teamsLabel = document.getElementById("teamsLabel");
     const matchMinute = document.getElementById("matchMinute");
     const fieldPanel = document.querySelector(".field-panel");
+    const fieldApron = document.querySelector(".field-apron");
     const field = document.getElementById("field");
     const currentLogCard = document.getElementById("currentLogCard");
     const currentLogText = document.getElementById("currentLogText");
@@ -2024,7 +2048,15 @@
       }
 
       const panelRect = fieldPanel.getBoundingClientRect();
-      const availableWidth = Math.max(260, Math.min(panelRect.width, 1000));
+      const apronRect = fieldApron ? fieldApron.getBoundingClientRect() : null;
+      const apronStyle = fieldApron ? getComputedStyle(fieldApron) : null;
+      const apronPaddingX = apronStyle
+        ? parseFloat(apronStyle.paddingLeft) + parseFloat(apronStyle.paddingRight)
+        : 0;
+      const availableOuterWidth = apronRect && apronRect.width
+        ? apronRect.width
+        : Math.min(panelRect.width, 998);
+      const availableWidth = Math.max(260, availableOuterWidth - apronPaddingX);
       const nextWidth = availableWidth;
       const nextHeight = nextWidth * (4 / 7);
 
