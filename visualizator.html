@@ -18,6 +18,14 @@
       --accent-2: #184f43;
       --field: #2d8a4d;
       --field-dark: #267643;
+      --pitch-marking: rgba(255,255,255,0.8);
+      --pitch-grid-line: rgba(255,255,255,0.14);
+      --pitch-grid-row: rgba(255,255,255,0.18);
+      --pitch-left-stripes: repeating-linear-gradient(90deg, var(--field) 0 calc(100% / 7), var(--field-dark) calc(100% / 7) calc(200% / 7));
+      --pitch-right-stripes: repeating-linear-gradient(90deg, var(--field-dark) 0 calc(100% / 7), var(--field) calc(100% / 7) calc(200% / 7));
+      --pitch-border: 2px;
+      --touchline-x: 18px;
+      --touchline-y: 14px;
       --home: #c8102e;
       --away: #111111;
       --danger: #9f1f1f;
@@ -92,7 +100,6 @@
       background: var(--panel);
       border-radius: 17px 17px 0 0;
       padding: 2px;
-      padding-bottom: 0;
     }
 
     .controls {
@@ -264,16 +271,32 @@
       overflow: hidden;
     }
 
+    .field-apron {
+      position: relative;
+      width: 100%;
+      min-height: 0;
+      padding: var(--touchline-y) var(--touchline-x);
+      overflow: hidden;
+      background: #2f8550;
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.16),
+        inset 0 0 22px rgba(10,58,31,0.22);
+      margin: 0 auto;
+    }
+
     .field-wrap {
       position: relative;
-      width: min(100%, 1000px);
+      width: 100%;
       min-height: 0;
       border-radius: 0;
-      overflow: hidden;
+      overflow: visible;
       background:
-        linear-gradient(90deg, var(--field) 0 7.14%, var(--field-dark) 7.14% 14.28%, var(--field) 14.28% 21.42%, var(--field-dark) 21.42% 28.56%, var(--field) 28.56% 35.7%, var(--field-dark) 35.7% 42.84%, var(--field) 42.84% 49.98%, var(--field-dark) 49.98% 57.12%, var(--field) 57.12% 64.26%, var(--field-dark) 64.26% 71.4%, var(--field) 71.4% 78.54%, var(--field-dark) 78.54% 85.68%, var(--field) 85.68% 92.82%, var(--field-dark) 92.82% 100%);
-      border: 2px solid #f5f1e7;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+        var(--pitch-left-stripes) left top / 50% 100% no-repeat,
+        var(--pitch-right-stripes) right top / 50% 100% no-repeat;
+      border: var(--pitch-border) solid #f5f1e7;
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.15),
+        0 0 0 1px rgba(17,81,46,0.24);
       margin: 0 auto;
     }
 
@@ -311,6 +334,8 @@
 
     .pitch-line,
     .pitch-circle,
+    .pitch-arc,
+    .pitch-spot,
     .pitch-box,
     .pitch-goal,
     .pitch-grid,
@@ -319,12 +344,7 @@
     }
 
     .pitch-line.mid {
-      top: 0;
-      bottom: 0;
-      left: 50%;
-      width: 2px;
-      background: rgba(255,255,255,0.8);
-      transform: translateX(-50%);
+      display: none;
     }
 
     .pitch-circle {
@@ -335,6 +355,44 @@
       border-radius: 50%;
       border: 2px solid rgba(255,255,255,0.8);
       transform: translate(-50%, -50%);
+    }
+
+    .pitch-arc {
+      top: 50%;
+      width: 17.5%;
+      aspect-ratio: 1;
+      border: 2px solid rgba(255,255,255,0.8);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translateY(-50%);
+    }
+
+    .pitch-arc.left {
+      left: 1.75%;
+      clip-path: inset(0 0 0 81.4%);
+    }
+
+    .pitch-arc.right {
+      right: 1.75%;
+      clip-path: inset(0 81.4% 0 0);
+    }
+
+    .pitch-spot {
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .pitch-spot.left {
+      left: 10.5%;
+    }
+
+    .pitch-spot.right {
+      left: 89.5%;
     }
 
     .pitch-box {
@@ -382,10 +440,10 @@
     .pitch-grid {
       inset: 0;
       pointer-events: none;
-      background-image:
-        linear-gradient(to right, rgba(255,255,255,0.14) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.18) 1px, transparent 1px);
-      background-size: calc(100% / 14) 100%, 100% 25%;
+      background:
+        linear-gradient(90deg, transparent calc(50% - 1px), var(--pitch-marking) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+        linear-gradient(to right, var(--pitch-grid-line) 1px, transparent 1px) 0 0 / calc(100% / 14) 100%,
+        linear-gradient(to bottom, var(--pitch-grid-row) 1px, transparent 1px) 0 0 / 100% 25%;
     }
 
     .cell-label {
@@ -972,6 +1030,8 @@
         --marker-size: 32px;
         --marker-font-size: 10px;
         --marker-tag-font-size: 10px;
+        --touchline-x: 10px;
+        --touchline-y: 8px;
       }
 
       .landing {
@@ -1109,20 +1169,26 @@
             </div>
           </section>
 
-          <div class="field-wrap" id="field">
-            <div class="pitch-grid"></div>
-            <div class="pitch-line mid"></div>
-            <div class="pitch-circle"></div>
-            <div class="pitch-box top"></div>
-            <div class="pitch-box top small"></div>
-            <div class="pitch-box bottom"></div>
-            <div class="pitch-box bottom small"></div>
-            <div class="trail-layer" id="trailLayer"></div>
-            <div class="marker-layer" id="markerLayer"></div>
+          <div class="field-apron">
+            <div class="field-wrap" id="field">
+              <div class="pitch-grid"></div>
+              <div class="pitch-line mid"></div>
+              <div class="pitch-circle"></div>
+              <div class="pitch-box top"></div>
+              <div class="pitch-arc left"></div>
+              <div class="pitch-spot left"></div>
+              <div class="pitch-box top small"></div>
+              <div class="pitch-box bottom"></div>
+              <div class="pitch-arc right"></div>
+              <div class="pitch-spot right"></div>
+              <div class="pitch-box bottom small"></div>
+              <div class="trail-layer" id="trailLayer"></div>
+              <div class="marker-layer" id="markerLayer"></div>
+            </div>
           </div>
           <div class="side-panel">
             <div class="details-row">
-              <section class="panel" style="border-radius: 0 0 17px 17px; padding-bottom: 2px; padding-top: 0;">
+              <section class="panel" style="border-radius: 0 0 17px 17px;">
                 <section id="currentLogCard" class="current-log-card">
                   <div id="currentLogText" class="current-log-text">После загрузки здесь появится текст текущего события.</div>
               </section>
@@ -1214,6 +1280,7 @@
     const teamsLabel = document.getElementById("teamsLabel");
     const matchMinute = document.getElementById("matchMinute");
     const fieldPanel = document.querySelector(".field-panel");
+    const fieldApron = document.querySelector(".field-apron");
     const field = document.getElementById("field");
     const currentLogCard = document.getElementById("currentLogCard");
     const currentLogText = document.getElementById("currentLogText");
@@ -1940,8 +2007,12 @@
       return `<span class="${className}">${teamName || "-"}</span>`;
     }
 
-    function coordToPercent(row, col) {
-      const [safeRow, safeCol] = clampCoord(row, col);
+    function coordToPercent(row, col, options = {}) {
+      const [baseRow, safeCol] = clampCoord(row, col);
+      const rawRow = Number(row);
+      const safeRow = options.allowOuterRows && Number.isFinite(rawRow)
+        ? Math.max(0.5, Math.min(FIELD_ROWS + 0.5, rawRow))
+        : baseRow;
       return {
         x: ((safeRow - 0.5) / FIELD_ROWS) * 100,
         y: ((safeCol - 0.5) / FIELD_COLS) * 100
@@ -1980,9 +2051,22 @@
       }
 
       const panelRect = fieldPanel.getBoundingClientRect();
-      const availableWidth = Math.max(260, Math.min(panelRect.width, 1000));
-      const nextWidth = availableWidth;
-      const nextHeight = nextWidth * (4 / 7);
+      const apronRect = fieldApron ? fieldApron.getBoundingClientRect() : null;
+      const apronStyle = fieldApron ? getComputedStyle(fieldApron) : null;
+      const fieldStyle = getComputedStyle(field);
+      const apronPaddingX = apronStyle
+        ? parseFloat(apronStyle.paddingLeft) + parseFloat(apronStyle.paddingRight)
+        : 0;
+      const fieldBorderX = parseFloat(fieldStyle.borderLeftWidth) + parseFloat(fieldStyle.borderRightWidth);
+      const fieldBorderY = parseFloat(fieldStyle.borderTopWidth) + parseFloat(fieldStyle.borderBottomWidth);
+      const availableOuterWidth = apronRect && apronRect.width
+        ? apronRect.width
+        : Math.min(panelRect.width, 998);
+      const availableWidth = Math.max(260, availableOuterWidth - apronPaddingX);
+      const nextContentWidth = Math.max(FIELD_ROWS * 18, Math.floor((availableWidth - fieldBorderX) / FIELD_ROWS) * FIELD_ROWS);
+      const nextWidth = nextContentWidth + fieldBorderX;
+      const nextContentHeight = nextContentWidth * (FIELD_COLS / (FIELD_ROWS / 2));
+      const nextHeight = nextContentHeight + fieldBorderY;
 
       field.style.width = `${nextWidth}px`;
       field.style.height = `${nextHeight}px`;
@@ -2081,7 +2165,7 @@
 
     function getShotGoalPoint(teamName) {
       const isAway = getTeamSide(normalizeText(teamName)) === "away";
-      return [isAway ? 1 : FIELD_ROWS, (FIELD_COLS + 1) / 2];
+      return [isAway ? 0.5 : FIELD_ROWS + 0.5, (FIELD_COLS + 1) / 2];
     }
 
     function getShotGoalkeeperMarker(snapshot) {
@@ -2787,7 +2871,7 @@
         }
 
         const side = getTeamSide(player.team);
-        const pos = coordToPercent(player.row, player.col);
+        const pos = coordToPercent(player.row, player.col, { allowOuterRows: player.isGoalkeeper });
         const stack = stackMap.get(`${player.row}:${player.col}`) || [player];
         const stackIndex = stack.findIndex((item) => item.markerId === playerId);
         const verticalOffset = (stackIndex - ((stack.length - 1) / 2)) * 50;
