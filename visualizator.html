@@ -2522,6 +2522,62 @@
       appendActionLine(fromPoint, toPoint, isFailed);
     }
 
+    function getPlayerCellDedupeKey(player) {
+      const playerKey = player.id || normalizePlayerNameKey(player.name);
+      if (!playerKey) {
+        return "";
+      }
+
+      return `${playerKey}:${player.row}:${player.col}`;
+    }
+
+    function getMarkerDedupePriority(player) {
+      if (player.role === "ball") {
+        return 60;
+      }
+
+      if (player.markerPhase === "overlay") {
+        return 50;
+      }
+
+      if (player.markerPhase === "current") {
+        return 40;
+      }
+
+      if (player.markerPhase === "next") {
+        return 10;
+      }
+
+      return 0;
+    }
+
+    function dedupeSamePlayerCellMarkers(entries) {
+      const deduped = [];
+      const indexByKey = new Map();
+
+      entries.forEach((player) => {
+        const key = getPlayerCellDedupeKey(player);
+        if (!key) {
+          deduped.push(player);
+          return;
+        }
+
+        const existingIndex = indexByKey.get(key);
+        if (existingIndex === undefined) {
+          indexByKey.set(key, deduped.length);
+          deduped.push(player);
+          return;
+        }
+
+        const existingPlayer = deduped[existingIndex];
+        if (getMarkerDedupePriority(player) > getMarkerDedupePriority(existingPlayer)) {
+          deduped[existingIndex] = player;
+        }
+      });
+
+      return deduped;
+    }
+
     function renderMarkers(currentSnapshot, nextSnapshot) {
       if (!currentSnapshot && !nextSnapshot) {
         trailLayer.innerHTML = "";
@@ -2599,9 +2655,10 @@
         }
       }
 
-      const nextIds = new Set(entries.map((player) => player.markerId));
+      const visibleEntries = dedupeSamePlayerCellMarkers(entries);
+      const nextIds = new Set(visibleEntries.map((player) => player.markerId));
 
-      entries.forEach((player) => {
+      visibleEntries.forEach((player) => {
         const key = `${player.row}:${player.col}`;
         if (!stackMap.has(key)) {
           stackMap.set(key, []);
@@ -2610,7 +2667,7 @@
       });
 
       const reusableIds = new Set();
-      entries.forEach((player) => {
+      visibleEntries.forEach((player) => {
         if (player.markerPhase === "current") {
           const previousNextId = `next:${player.id}`;
           if (state.markerNodes[previousNextId]) {
@@ -2634,7 +2691,7 @@
         }
       });
 
-      entries.forEach((player) => {
+      visibleEntries.forEach((player) => {
         const playerId = player.markerId;
         let marker = state.markerNodes[playerId];
         let isNewMarker = false;
