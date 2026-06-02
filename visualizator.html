@@ -2101,15 +2101,15 @@
       };
     }
 
-    function getCornerKickPasserPoint(snapshot) {
-      const shotPoint = snapshot && snapshot.focusPoint ? snapshot.focusPoint : START_COORD_FALLBACK;
+    function getCornerKickPasserPoint(snapshot, sourcePoint = null) {
+      const shotPoint = sourcePoint || (snapshot && snapshot.focusPoint ? snapshot.focusPoint : START_COORD_FALLBACK);
       return [
         1,
         shotPoint[1] >= 3 ? 4 : 1
       ];
     }
 
-    function getCornerKickPassInfo(snapshot) {
+    function getCornerKickPassInfo(snapshot, sourcePoint = null) {
       if (!snapshot || !isCornerKickNavesShotEvent(snapshot.event)) {
         return null;
       }
@@ -2120,7 +2120,7 @@
         || parseNamedIdReference(snapshot.event.mixed_action, "prev_pm")
         || parseNamedIdReference(snapshot.event.raw_text, "prev_pm");
       const previousState = passerId && snapshot.previousPlayersById ? snapshot.previousPlayersById[passerId] : null;
-      const fromPoint = getCornerKickPasserPoint(snapshot);
+      const fromPoint = getCornerKickPasserPoint(snapshot, sourcePoint);
       const toPoint = snapshot.focusPoint || (
         prevPass.coords[1]
           ? clampCoord(prevPass.coords[1][0], prevPass.coords[1][1])
@@ -2142,8 +2142,8 @@
       };
     }
 
-    function getCornerKickPasserMarker(snapshot) {
-      const passInfo = getCornerKickPassInfo(snapshot);
+    function getCornerKickPasserMarker(snapshot, sourcePoint = null) {
+      const passInfo = getCornerKickPassInfo(snapshot, sourcePoint);
       if (!passInfo) {
         return null;
       }
@@ -2631,7 +2631,8 @@
       const shouldRenderNextSnapshotPlayers = nextSnapshot
         && !isFoulFrame
         && currentAction !== "розыгрыш"
-        && !isPassFollowedByFoul(currentSnapshot, nextSnapshot);
+        && !isPassFollowedByFoul(currentSnapshot, nextSnapshot)
+        && !isCornerKickNavesShotEvent(nextSnapshot.event);
 
       if (shouldRenderNextSnapshotPlayers) {
         Object.values(nextSnapshot.players).forEach((player) => {
@@ -2641,6 +2642,17 @@
             markerPhase: "next"
           });
         });
+      }
+
+      if (nextSnapshot && !isFoulFrame && isCornerKickNavesShotEvent(nextSnapshot.event)) {
+        const nextCornerPasser = getCornerKickPasserMarker(nextSnapshot, currentSnapshot && currentSnapshot.focusPoint);
+        if (nextCornerPasser) {
+          entries.push({
+            ...nextCornerPasser,
+            markerId: `next:${nextCornerPasser.markerId}`,
+            markerPhase: "next"
+          });
+        }
       }
 
       if (!isFoulFrame) {
