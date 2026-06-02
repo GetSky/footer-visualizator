@@ -277,9 +277,7 @@
       min-height: 0;
       padding: var(--touchline-y) var(--touchline-x);
       overflow: hidden;
-      background:
-        var(--pitch-left-stripes) left top / 50% 100% no-repeat,
-        var(--pitch-right-stripes) right top / 50% 100% no-repeat;
+      background: #2f8550;
       box-shadow:
         inset 0 0 0 1px rgba(255,255,255,0.16),
         inset 0 0 22px rgba(10,58,31,0.22);
@@ -291,8 +289,10 @@
       width: 100%;
       min-height: 0;
       border-radius: 0;
-      overflow: hidden;
-      background: transparent;
+      overflow: visible;
+      background:
+        var(--pitch-left-stripes) left top / 50% 100% no-repeat,
+        var(--pitch-right-stripes) right top / 50% 100% no-repeat;
       border: var(--pitch-border) solid #f5f1e7;
       box-shadow:
         inset 0 0 0 1px rgba(255,255,255,0.15),
@@ -2007,8 +2007,12 @@
       return `<span class="${className}">${teamName || "-"}</span>`;
     }
 
-    function coordToPercent(row, col) {
-      const [safeRow, safeCol] = clampCoord(row, col);
+    function coordToPercent(row, col, options = {}) {
+      const [baseRow, safeCol] = clampCoord(row, col);
+      const rawRow = Number(row);
+      const safeRow = options.allowOuterRows && Number.isFinite(rawRow)
+        ? Math.max(0.5, Math.min(FIELD_ROWS + 0.5, rawRow))
+        : baseRow;
       return {
         x: ((safeRow - 0.5) / FIELD_ROWS) * 100,
         y: ((safeCol - 0.5) / FIELD_COLS) * 100
@@ -2161,7 +2165,7 @@
 
     function getShotGoalPoint(teamName) {
       const isAway = getTeamSide(normalizeText(teamName)) === "away";
-      return [isAway ? 1 : FIELD_ROWS, (FIELD_COLS + 1) / 2];
+      return [isAway ? 0.5 : FIELD_ROWS + 0.5, (FIELD_COLS + 1) / 2];
     }
 
     function getShotGoalkeeperMarker(snapshot) {
@@ -2867,7 +2871,7 @@
         }
 
         const side = getTeamSide(player.team);
-        const pos = coordToPercent(player.row, player.col);
+        const pos = coordToPercent(player.row, player.col, { allowOuterRows: player.isGoalkeeper });
         const stack = stackMap.get(`${player.row}:${player.col}`) || [player];
         const stackIndex = stack.findIndex((item) => item.markerId === playerId);
         const verticalOffset = (stackIndex - ((stack.length - 1) / 2)) * 50;
