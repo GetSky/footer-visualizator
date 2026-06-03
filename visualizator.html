@@ -584,6 +584,13 @@
         0 0 0 8px rgba(246, 190, 64, 0.18);
     }
 
+    .player-marker.mixed-passer {
+      border-color: rgba(246, 190, 64, 0.98);
+      box-shadow:
+        0 10px 20px rgba(0,0,0,0.18),
+        0 0 0 8px rgba(246, 190, 64, 0.18);
+    }
+
     .player-marker.goalkeeper {
       border-color: rgba(90, 190, 255, 0.98);
       box-shadow:
@@ -2163,6 +2170,11 @@
       return normalizeText(event && event.mixed_action).toLowerCase().includes("cornerkick_naves_shot");
     }
 
+    function isNavesShotEvent(event) {
+      const mixedAction = normalizeText(event && event.mixed_action).toLowerCase();
+      return mixedAction === "naves_shot";
+    }
+
     function getShotGoalPoint(teamName) {
       const isAway = getTeamSide(normalizeText(teamName)) === "away";
       return [isAway ? 0.5 : FIELD_ROWS + 0.5, (FIELD_COLS + 1) / 2];
@@ -2307,6 +2319,52 @@
         markerId: `corner-passer:${snapshot.event.index}:${passInfo.passer.id || passInfo.passer.name}`,
         markerPhase: "overlay",
         isCornerPasser: true
+      };
+    }
+
+    function getMixedNavesShotPassInfo(snapshot) {
+      if (!snapshot || !isNavesShotEvent(snapshot.event)) {
+        return null;
+      }
+
+      const passerId = parsePlayerIdReference(snapshot.event.prev_pm)
+        || parseNamedIdReference(snapshot.event.mixed_action, "prev_pm")
+        || parseNamedIdReference(snapshot.event.raw_text, "prev_pm");
+      const previousState = passerId && snapshot.previousPlayersById ? snapshot.previousPlayersById[passerId] : null;
+      const passer = resolvePlayerById(passerId, snapshot);
+      const toPoint = snapshot.focusPoint;
+
+      if (!previousState || !passer || !toPoint) {
+        return null;
+      }
+
+      return {
+        fromPoint: [previousState.row, previousState.col],
+        toPoint,
+        passer,
+        team: previousState.team || state.teamByPlayerId[passer.id] || normalizeText(snapshot.event.team)
+      };
+    }
+
+    function getMixedNavesShotPasserMarker(snapshot) {
+      const passInfo = getMixedNavesShotPassInfo(snapshot);
+      if (!passInfo) {
+        return null;
+      }
+
+      return {
+        ...makePlayerState(
+          passInfo.passer,
+          passInfo.team,
+          passInfo.fromPoint[0],
+          passInfo.fromPoint[1],
+          "mixed-passer",
+          snapshot.event.index,
+          passInfo.team
+        ),
+        markerId: `mixed-passer:${snapshot.event.index}:${passInfo.passer.id || passInfo.passer.name}`,
+        markerPhase: "overlay",
+        isMixedPasser: true
       };
     }
 
@@ -2620,7 +2678,7 @@
       }
 
       const action = String((currentSnapshot.event && currentSnapshot.event.action) || "").toLowerCase();
-      if (!isPassAction(action) && !isShotAction(action) && !isCornerKickNavesShotEvent(currentSnapshot.event)) {
+      if (!isPassAction(action) && !isShotAction(action) && !isCornerKickNavesShotEvent(currentSnapshot.event) && !isNavesShotEvent(currentSnapshot.event)) {
         return;
       }
 
@@ -2632,6 +2690,11 @@
       const cornerPassInfo = getCornerKickPassInfo(currentSnapshot);
       if (cornerPassInfo) {
         appendActionLine(cornerPassInfo.fromPoint, cornerPassInfo.toPoint, false, "mixed-pass");
+      }
+
+      const mixedNavesShotPassInfo = getMixedNavesShotPassInfo(currentSnapshot);
+      if (mixedNavesShotPassInfo) {
+        appendActionLine(mixedNavesShotPassInfo.fromPoint, mixedNavesShotPassInfo.toPoint, false, "mixed-pass");
       }
 
       let toPoint = null;
@@ -2774,6 +2837,11 @@
         entries.push(cornerPasser);
       }
 
+      const mixedPasser = !isFoulFrame ? getMixedNavesShotPasserMarker(currentSnapshot) : null;
+      if (mixedPasser) {
+        entries.push(mixedPasser);
+      }
+
       const shotGoalkeeper = !isFoulFrame ? getShotGoalkeeperMarker(currentSnapshot) : null;
       if (shotGoalkeeper) {
         entries.push(shotGoalkeeper);
@@ -2880,7 +2948,7 @@
         const stack = stackMap.get(`${player.row}:${player.col}`) || [player];
         const stackIndex = stack.findIndex((item) => item.markerId === playerId);
         const verticalOffset = (stackIndex - ((stack.length - 1) / 2)) * 50;
-        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""} ${player.isGoalkeeper ? "goalkeeper" : ""}`;
+        marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""} ${player.isMixedPasser ? "mixed-passer" : ""} ${player.isGoalkeeper ? "goalkeeper" : ""}`;
         marker.style.left = `${pos.x}%`;
         marker.style.top = `calc(${pos.y}% + ${verticalOffset}px)`;
         marker.style.zIndex = (player.isIncomingOpponent || player.isPassTarget)
