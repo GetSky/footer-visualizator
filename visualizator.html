@@ -2244,9 +2244,14 @@
 
     function getCornerKickPasserPoint(snapshot, sourcePoint = null) {
       const shotPoint = sourcePoint || (snapshot && snapshot.focusPoint ? snapshot.focusPoint : START_COORD_FALLBACK);
+      const teamName = normalizeText(snapshot && snapshot.event && snapshot.event.team);
+      const teamIndex = state.teams.indexOf(teamName);
+      const attackingRow = teamIndex === 1
+        ? 1
+        : (teamIndex === 0 ? FIELD_ROWS : (shotPoint[0] > FIELD_ROWS / 2 ? FIELD_ROWS : 1));
       return [
-        1,
-        shotPoint[1] >= 3 ? 4 : 1
+        attackingRow,
+        shotPoint[1] >= (FIELD_COLS + 1) / 2 ? FIELD_COLS : 1
       ];
     }
 
@@ -2795,7 +2800,7 @@
       }
 
       if (nextSnapshot && !isFoulFrame && isCornerKickNavesShotEvent(nextSnapshot.event)) {
-        const nextCornerPasser = getCornerKickPasserMarker(nextSnapshot, currentSnapshot && currentSnapshot.focusPoint);
+        const nextCornerPasser = getCornerKickPasserMarker(nextSnapshot);
         if (nextCornerPasser) {
           entries.push({
             ...nextCornerPasser,
