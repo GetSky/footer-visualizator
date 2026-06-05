@@ -1,0 +1,174 @@
+:root {
+  --bg: #efe7d1;
+  --panel: #fbf6ea;
+  --line: #cdb88c;
+  --text: #1d1b18;
+  --muted: #6d6559;
+  --accent: #b34d16;
+  --accent-2: #184f43;
+  --field: #2d8a4d;
+  --field-dark: #267643;
+  --pitch-marking: rgba(255,255,255,0.8);
+  --pitch-grid-line: rgba(255,255,255,0.14);
+  --pitch-grid-row: rgba(255,255,255,0.18);
+  --pitch-left-stripes: repeating-linear-gradient(90deg, var(--field) 0 calc(100% / 7), var(--field-dark) calc(100% / 7) calc(200% / 7));
+  --pitch-right-stripes: repeating-linear-gradient(90deg, var(--field-dark) 0 calc(100% / 7), var(--field) calc(100% / 7) calc(200% / 7));
+  --pitch-border: 2px;
+  --touchline-x: 18px;
+  --touchline-y: 14px;
+  --home: #c8102e;
+  --away: #111111;
+  --danger: #9f1f1f;
+  --marker-size: 44px;
+  --marker-font-size: 12px;
+  --marker-tag-font-size: 12px;
+  --shadow: 0 16px 40px rgba(45, 31, 11, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: "Source Code Pro", monospace;
+  background: rgba(255, 255, 255, 0);
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+main {
+  min-height: 100vh;
+}
+
+.landing {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.landing-card {
+  width: min(760px, 100%);
+  background: #fbf6ea;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.app-shell {
+  display: none;
+  min-height: 100vh;
+  padding: 0;
+}
+
+body.loaded .landing {
+  display: none;
+}
+
+body.loaded .app-shell {
+  display: block;
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-size: clamp(30px, 4.3vw, 48px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.panel {
+  width: 100%;
+  background: var(--panel);
+  border-radius: 17px 17px 0 0;
+  padding: 2px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+input[type="url"],
+input[type="file"],
+input[type="range"],
+select,
+button,
+textarea {
+  font: inherit;
+}
+
+input[type="url"],
+input[type="file"],
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 11px 16px;
+  background: #fff;
+  color: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, var(--accent), #cd6a20);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: linear-gradient(135deg, var(--accent-2), #28715f);
+}
+
+button.ghost {
+  background: #efe4cc;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 1120px) {
+  :root {
+    --marker-size: 38px;
+    --marker-font-size: 11px;
+    --marker-tag-font-size: 11px;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --marker-size: 32px;
+    --marker-font-size: 10px;
+    --marker-tag-font-size: 10px;
+    --touchline-x: 10px;
+    --touchline-y: 8px;
+  }
+
+  .landing {
+    padding: 12px;
+  }
+
+  .landing-card {
+    padding: 18px;
+  }
+
+  .controls {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,381 @@
+.field-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.field-apron {
+  position: relative;
+  width: 100%;
+  min-height: 0;
+  padding: var(--touchline-y) var(--touchline-x);
+  overflow: hidden;
+  background: #2f8550;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.16),
+    inset 0 0 22px rgba(10,58,31,0.22);
+  margin: 0 auto;
+}
+
+.field-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 0;
+  border-radius: 0;
+  overflow: visible;
+  background:
+    var(--pitch-left-stripes) left top / 50% 100% no-repeat,
+    var(--pitch-right-stripes) right top / 50% 100% no-repeat;
+  border: var(--pitch-border) solid #f5f1e7;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.15),
+    0 0 0 1px rgba(17,81,46,0.24);
+  margin: 0 auto;
+}
+
+.current-log-card {
+  width: min(100%, 1000px);
+  margin: 0;
+  border-radius: 0 0 14px 14px;
+  padding: 14px 16px;
+  border: 1px solid #c8bea8;
+  transition: background-color 220ms ease, border-color 220ms ease;
+}
+
+.current-log-card.home {
+  background: #fff1f3;
+  border-color: #c8102e;
+}
+
+.current-log-card.away {
+  background: #fff3b0;
+  border-color: #111111;
+}
+
+.current-log-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.current-log-text {
+  line-height: 1.55;
+}
+
+.pitch-line,
+.pitch-circle,
+.pitch-arc,
+.pitch-spot,
+.pitch-box,
+.pitch-goal,
+.pitch-grid,
+.cell-label {
+  position: absolute;
+}
+
+.pitch-line.mid {
+  display: none;
+}
+
+.pitch-circle {
+  left: 50%;
+  top: 50%;
+  width: 20%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.8);
+  transform: translate(-50%, -50%);
+}
+
+.pitch-arc {
+  top: 50%;
+  width: 17.5%;
+  aspect-ratio: 1;
+  border: 2px solid rgba(255,255,255,0.8);
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.pitch-arc.left {
+  left: 1.75%;
+  clip-path: inset(0 0 0 81.4%);
+}
+
+.pitch-arc.right {
+  right: 1.75%;
+  clip-path: inset(0 81.4% 0 0);
+}
+
+.pitch-spot {
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.pitch-spot.left {
+  left: 10.5%;
+}
+
+.pitch-spot.right {
+  left: 89.5%;
+}
+
+.pitch-box {
+  top: 18%;
+  height: 64%;
+  border: 2px solid rgba(255,255,255,0.8);
+}
+
+.pitch-box.top {
+  left: 0;
+  width: 16%;
+  border-left: 0;
+}
+
+.pitch-box.bottom {
+  right: 0;
+  width: 16%;
+  border-right: 0;
+}
+
+.pitch-box.top.small,
+.pitch-box.bottom.small {
+  top: 30%;
+  height: 40%;
+  width: 7%;
+}
+
+.pitch-goal {
+  top: 38%;
+  height: 24%;
+  width: 2%;
+  border: 2px solid rgba(255,255,255,0.85);
+}
+
+.pitch-goal.top {
+  left: 0;
+  border-left: 0;
+}
+
+.pitch-goal.bottom {
+  right: 0;
+  border-right: 0;
+}
+
+.pitch-grid {
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent calc(50% - 1px), var(--pitch-marking) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(to right, var(--pitch-grid-line) 1px, transparent 1px) 0 0 / calc(100% / 14) 100%,
+    linear-gradient(to bottom, var(--pitch-grid-row) 1px, transparent 1px) 0 0 / 100% 25%;
+}
+
+.cell-label {
+  font: 12px/1.2 "Source Code Pro", monospace;
+  color: rgba(255,255,255,0.82);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  pointer-events: none;
+}
+
+.trail-layer,
+.marker-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.pass-line {
+  position: absolute;
+  height: 5px;
+  transform-origin: left center;
+  border-radius: 999px;
+  box-shadow: 0 0 14px rgba(255,255,255,0.22);
+  opacity: 0.9;
+  z-index: 8;
+  --pass-angle: 0deg;
+  transform: translateY(-50%) rotate(var(--pass-angle)) scaleX(1);
+  animation: pass-line-grow 320ms cubic-bezier(.22,1,.36,1) both;
+}
+
+.pass-line.success {
+  background: linear-gradient(90deg, rgba(73, 180, 91, 0.95), rgba(73, 180, 91, 0.3));
+}
+
+.pass-line.fail {
+  background: linear-gradient(90deg, rgba(208, 64, 64, 0.95), rgba(208, 64, 64, 0.3));
+}
+
+.pass-line.mixed-pass {
+  height: 4px;
+  background: linear-gradient(90deg, rgba(246, 190, 64, 0.96), rgba(246, 190, 64, 0.28));
+  z-index: 9;
+}
+
+.player-marker {
+  position: absolute;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition:
+    left 420ms cubic-bezier(.22,1,.36,1),
+    top 420ms cubic-bezier(.22,1,.36,1),
+    transform 220ms ease,
+    opacity 220ms ease;
+  display: grid;
+  place-items: center;
+  font: 700 var(--marker-font-size)/1 "Source Code Pro", monospace;
+  color: #fff;
+  border: 2px solid rgba(255,255,255,0.88);
+  box-shadow:
+    0 10px 20px rgba(0,0,0,0.18),
+    0 0 0 8px rgba(255,255,255,0.07);
+  --marker-opacity: 1;
+  opacity: var(--marker-opacity);
+}
+
+.player-marker.entering {
+  animation: marker-fade-in 260ms ease;
+}
+
+.player-marker.leaving {
+  animation: marker-fade-out 220ms ease forwards;
+  pointer-events: none;
+}
+
+.player-marker.home {
+  background:
+    linear-gradient(90deg, #ffffff 0 18%, transparent 18% 82%, #ffffff 82% 100%),
+    var(--home);
+}
+
+.player-marker.away {
+  background:
+    linear-gradient(90deg, #f7c600 0 18%, transparent 18% 82%, #f7c600 82% 100%),
+    var(--away);
+}
+
+.player-marker.active {
+  transform: translate(-50%, -50%) scale(1.12);
+}
+
+.player-marker::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.22);
+  animation: pulse 1.8s infinite;
+}
+
+.player-marker.dim::after {
+  display: none;
+}
+
+.player-marker.next-step {
+  --marker-opacity: 0.48;
+  filter: saturate(0.78);
+}
+
+.player-tag {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 7px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font: var(--marker-tag-font-size)/1.2 "Source Code Pro", monospace;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+}
+
+.player-marker.incoming-opponent {
+  border-color: rgba(255, 133, 133, 0.98);
+  box-shadow:
+    0 10px 20px rgba(0,0,0,0.18),
+    0 0 0 8px rgba(159, 31, 31, 0.18);
+}
+
+.player-marker.failed-target {
+  border-color: rgba(255, 133, 133, 0.98);
+}
+
+.player-marker.corner-passer {
+  border-color: rgba(246, 190, 64, 0.98);
+  box-shadow:
+    0 10px 20px rgba(0,0,0,0.18),
+    0 0 0 8px rgba(246, 190, 64, 0.18);
+}
+
+.player-marker.mixed-passer {
+  border-color: rgba(246, 190, 64, 0.98);
+  box-shadow:
+    0 10px 20px rgba(0,0,0,0.18),
+    0 0 0 8px rgba(246, 190, 64, 0.18);
+}
+
+.player-marker.goalkeeper {
+  border-color: rgba(90, 190, 255, 0.98);
+  box-shadow:
+    0 10px 20px rgba(0,0,0,0.18),
+    0 0 0 8px rgba(90, 190, 255, 0.18);
+}
+
+.player-tag.danger-tag {
+  color: #ffd6d6;
+}
+
+.player-tag .danger-arrow {
+  color: #ff5d5d;
+  font-weight: 900;
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+
+.team-home {
+  color: var(--home);
+}
+
+.team-away {
+  color: var(--away);
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.92); opacity: 0.5; }
+  70% { transform: scale(1.2); opacity: 0; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+@keyframes marker-fade-in {
+  0% { opacity: 0; }
+  100% { opacity: var(--marker-opacity); }
+}
+
+@keyframes marker-fade-out {
+  0% { opacity: var(--marker-opacity); }
+  100% { opacity: 0; }
+}
+
+@keyframes pass-line-grow {
+  0% {
+    transform: translateY(-50%) rotate(var(--pass-angle)) scaleX(0);
+  }
+  100% {
+    transform: translateY(-50%) rotate(var(--pass-angle)) scaleX(1);
+  }
+}
