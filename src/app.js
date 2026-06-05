@@ -1,25 +1,14 @@
-const FIELD_ROWS = 14;
-const FIELD_COLS = 4;
-const TEAM_COLORS = ["home", "away"];
-const START_COORD_FALLBACK = [8, 2];
-const KICKOFF_POINT = [7.5, 2.5];
-
-const divhistKeyMap = {
-  "игрок_с_мячом": "player_with_ball",
-  "команда": "team",
-  "минута": "time",
-  "итерация": "step",
-  "itreation": "step",
-  "iteration": "step",
-  "действие": "action",
-  "принимающий": "target",
-  "коорд": "position",
-  "результат": "result",
-  "соперник": "opponent",
-  "mixed_action": "mixed_action",
-  "prev_pm": "prev_pm",
-  "prev_pass": "prev_pass"
-};
+import {
+  FIELD_COLS,
+  FIELD_ROWS,
+  FOOTTER_PROXY_MATCH_URL,
+  KICKOFF_POINT,
+  START_COORD_FALLBACK,
+  TEAM_COLORS
+} from "./constants.js";
+import { coerceValue, divhistKeyMap, parsePrevPassValue } from "./parsers/events.js";
+import { parseNamedIdReference, parsePlayerIdReference, parsePlayerValue } from "./parsers/players.js";
+import { normalizeText, slugifyKey, toAbsoluteUrl } from "./utils/text.js";
 
 const urlInput = document.getElementById("urlInput");
 const loadButton = document.getElementById("loadButton");
@@ -158,30 +147,6 @@ function failProgress(stepKey, detail) {
   updateProgress(stepKey, detail, "error");
 }
 
-function normalizeText(value) {
-  return (value || "")
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function toAbsoluteUrl(path, baseUrl) {
-  try {
-    return new URL(path, baseUrl).href;
-  } catch {
-    return path;
-  }
-}
-
-function slugifyKey(value, fallback) {
-  const slug = normalizeText(value)
-    .toLowerCase()
-    .replace(/[^a-zа-яё0-9]+/gi, "_")
-    .replace(/^_+|_+$/g, "");
-  return slug || fallback;
-}
-
 function splitDivhistLines(element) {
   const rows = [];
   let current = [];
@@ -205,102 +170,6 @@ function splitDivhistLines(element) {
   }
 
   return rows.filter(Boolean);
-}
-
-function parsePlayerValue(raw) {
-  const value = normalizeText(raw);
-  if (!value) {
-    return null;
-  }
-
-  const match = value.match(/^(\d+)\s+(.+)$/);
-  if (!match) {
-    return { id: null, name: value, label: value };
-  }
-
-  return {
-    id: match[1],
-    name: match[2],
-    label: value
-  };
-}
-
-function parsePlayerIdReference(raw) {
-  const value = normalizeText(raw);
-  if (!value || value === "None") {
-    return "";
-  }
-
-  const match = value.match(/\d+/);
-  return match ? match[0] : "";
-}
-
-function parseNamedIdReference(raw, key) {
-  const value = normalizeText(raw);
-  if (!value) {
-    return "";
-  }
-
-  const match = value.match(new RegExp(`${key}\\s*:\\s*(\\d+)`));
-  return match ? match[1] : "";
-}
-
-function parsePositionValue(raw) {
-  const value = normalizeText(raw);
-  if (!value) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(value.replace(/\(/g, "[").replace(/\)/g, "]"));
-    if (Array.isArray(parsed)) {
-      return parsed.filter(Array.isArray).map((pair) => pair.map((item) => Number(item)));
-    }
-  } catch {
-  }
-
-  const matches = [...value.matchAll(/\[(\d+)\s*,\s*(\d+)\]/g)];
-  return matches.map((match) => [Number(match[1]), Number(match[2])]);
-}
-
-function parsePrevPassValue(raw) {
-  const value = normalizeText(raw);
-  if (!value) {
-    return { pm: "", coords: [] };
-  }
-
-  const pmMatch = value.match(/['"]?pm['"]?\s*:\s*(\d+)/);
-  const coordMatch = value.match(/['"]?coord['"]?\s*:\s*(\[\s*\[[^\]]+\]\s*,\s*\[[^\]]+\]\s*\])/);
-  return {
-    pm: pmMatch ? pmMatch[1] : "",
-    coords: coordMatch ? parsePositionValue(coordMatch[1]) : []
-  };
-}
-
-function coerceValue(key, raw) {
-  const value = normalizeText(raw);
-  if (!value) {
-    return "";
-  }
-
-  if (key === "time" || key === "step") {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : value;
-  }
-
-  if (key === "position") {
-    return parsePositionValue(value);
-  }
-
-  if (key === "result") {
-    if (value === "True") return true;
-    if (value === "False") return false;
-    if (/^-?\d+(\.\d+)?$/.test(value)) {
-      return Number(value);
-    }
-  }
-
-  return value;
 }
 
 function divhistToEvent(element, index) {
@@ -331,7 +200,6 @@ function divhistToEvent(element, index) {
   return event;
 }
 
-const FOOTTER_PROXY_MATCH_URL = "https://getsky.tech/footter_proxy_match";
 
 function extractMatchLogUrl(doc, pageUrl) {
   const fullLog = doc.querySelector("#full_log");

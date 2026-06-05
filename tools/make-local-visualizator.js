@@ -11,11 +11,44 @@ const localBasePath = "../";
 
 const html = fs.readFileSync(sourcePath, "utf8");
 
+const moduleOrder = [
+  "src/constants.js",
+  "src/utils/text.js",
+  "src/parsers/players.js",
+  "src/parsers/events.js",
+  "src/app.js",
+];
+
+function toClassicScript(source) {
+  return source
+    .replace(/^import\s+[\s\S]*?;\r?\n/gm, "")
+    .replace(/^export\s+/gm, "");
+}
+
+function buildLocalScript() {
+  return moduleOrder
+    .map((asset) => {
+      const source = fs.readFileSync(path.join(rootDir, asset), "utf8");
+      return `\n/* ${asset} */\n${toClassicScript(source).trimEnd()}\n`;
+    })
+    .join("\n");
+}
+
 if (!html.includes(remoteBaseUrl)) {
   throw new Error(`Expected ${sourcePath} to contain ${remoteBaseUrl}`);
 }
 
-const localHtml = html.replaceAll(remoteBaseUrl, localBasePath);
+const localScript = buildLocalScript();
+const remoteScriptTag = `<script type="module" src="${remoteBaseUrl}src/app.js"></script>`;
+const localScriptTag = `<script>\n${localScript}</script>`;
+
+if (!html.includes(remoteScriptTag)) {
+  throw new Error(`Expected ${sourcePath} to contain ${remoteScriptTag}`);
+}
+
+const localHtml = html
+  .replaceAll(remoteBaseUrl, localBasePath)
+  .replace(`<script type="module" src="${localBasePath}src/app.js"></script>`, localScriptTag);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, localHtml, "utf8");
