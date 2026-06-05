@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "build:local": "node tools/make-local-visualizator.js",
+    "check:local": "npm run build:local && node tools/check-local-build.js"
+  }
+}
