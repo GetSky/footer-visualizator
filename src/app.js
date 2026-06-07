@@ -6,6 +6,33 @@ import {
   TEAM_COLORS
 } from "./constants.js";
 import { coerceValue, divhistKeyMap, parsePrevPassValue } from "./parsers/events.js";
+import {
+  buildScore,
+  buildScoreUntilIndex,
+  getResultLabel,
+  getSnapshotAction,
+  isCornerKickNavesEvent,
+  isCornerKickNavesShotEvent,
+  isCornerPassEvent,
+  isDribbleAction,
+  isFailedPassResult,
+  isFoulAction,
+  isNavesShotEvent,
+  isPassAction,
+  isShotAction,
+  isSubstitutionAction,
+  isZeroLikeResult,
+  normalizeActionLabel,
+  samePlayer
+} from "./match/actions.js";
+import {
+  buildPlayerInfoById,
+  buildPlayerPositionById,
+  extractPositionByPlayerName,
+  makeDisplayName
+} from "./match/players.js";
+import { buildSnapshots } from "./match/snapshots.js";
+import { extractTeamsFromMatchDoc, inferTeamByPlayer } from "./match/teams.js";
 import { parseNamedIdReference, parsePlayerIdReference, parsePlayerValue } from "./parsers/players.js";
 import {
   buildHostedRemoteFetchMessage,
@@ -228,176 +255,6 @@ function getInitialSourceLabel(pageUrl, pageFile) {
   return "-";
 }
 
-function getUniqueTeams(events) {
-  return Array.from(new Set(events.map((event) => normalizeText(event.team)).filter(Boolean))).slice(0, 2);
-}
-
-function isFootballPosition(value) {
-  return /^(GK|LD|CD|RD|LWB|DM|RWB|LM|CM|RM|LW|AM|RW|CF)$/i.test(normalizeText(value));
-}
-
-function normalizePlayerNameKey(value) {
-  return normalizeText(value).toLowerCase();
-}
-
-function extractPositionByPlayerName(doc) {
-  const map = {};
-  if (!doc) {
-    return map;
-  }
-
-  Array.from(doc.querySelectorAll("table.players tr, #player-stat_div table tr")).forEach((row) => {
-    const cells = Array.from(row.querySelectorAll("td")).map((cell) => normalizeText(cell.textContent));
-    if (cells.length < 3) {
-      return;
-    }
-
-    let position = "";
-    let playerName = "";
-
-    if (isFootballPosition(cells[0])) {
-      position = cells[0];
-      playerName = cells[1];
-    } else if (isFootballPosition(cells[2])) {
-      position = cells[2];
-      playerName = cells[1];
-    }
-
-    const key = normalizePlayerNameKey(playerName);
-    if (key && position) {
-      map[key] = position.toUpperCase();
-    }
-  });
-
-  return map;
-}
-
-function collectEventPlayers(event) {
-  return [
-    parsePlayerValue(event.player_with_ball),
-    parsePlayerValue(event.target),
-    parsePlayerValue(event.opponent)
-  ].filter(Boolean);
-}
-
-function buildPlayerInfoById(events) {
-  const map = {};
-
-  events.forEach((event) => {
-    collectEventPlayers(event).forEach((player) => {
-      if (player.id && !map[player.id]) {
-        map[player.id] = player;
-      }
-    });
-  });
-
-  return map;
-}
-
-function buildPlayerPositionById(events, positionByPlayerName) {
-  const map = {};
-
-  events.forEach((event) => {
-    collectEventPlayers(event).forEach((player) => {
-      if (!player.id || map[player.id]) {
-        return;
-      }
-
-      const position = positionByPlayerName[normalizePlayerNameKey(player.name)];
-      if (position) {
-        map[player.id] = position;
-      }
-    });
-  });
-
-  return map;
-}
-
-function extractTeamsFromMatchDoc(doc, events) {
-  if (!doc) {
-    return getUniqueTeams(events);
-  }
-
-  const leftNode = doc.querySelector("#team_left");
-  const rightNode = doc.querySelector("#team_rigth, #team_right");
-  const leftText = normalizeText(leftNode ? leftNode.textContent : "");
-  const rightText = normalizeText(rightNode ? rightNode.textContent : "");
-
-  if (leftText && rightText) {
-    return [leftText, rightText];
-  }
-
-  const scriptText = Array.from(doc.scripts).map((script) => script.textContent || "").join("\n");
-  const leftMatch = scriptText.match(/\$\("#team_left"\)\.html\("([^"]+)"\)/);
-  const rightMatch = scriptText.match(/\$\("#team_rigth"\)\.html\("([^"]+)"\)|\$\("#team_right"\)\.html\("([^"]+)"\)/);
-  const leftFromScript = normalizeText(leftMatch ? leftMatch[1] : "");
-  const rightFromScript = normalizeText(rightMatch ? (rightMatch[1] || rightMatch[2] || "") : "");
-
-  if (leftFromScript && rightFromScript) {
-    return [leftFromScript, rightFromScript];
-  }
-
-  return getUniqueTeams(events);
-}
-
-function inferTeamByPlayer(events, teams) {
-  const map = {};
-
-  function assign(player, team) {
-    if (!player || !player.id || !team || map[player.id]) {
-      return;
-    }
-    map[player.id] = team;
-  }
-
-  function otherTeam(team) {
-    return teams.find((item) => item !== team) || team;
-  }
-
-  events.forEach((event) => {
-    const actor = parsePlayerValue(event.player_with_ball);
-    const target = parsePlayerValue(event.target);
-    const opponent = parsePlayerValue(event.opponent);
-    const team = normalizeText(event.team);
-
-    assign(actor, team);
-    assign(target, team);
-    assign(opponent, otherTeam(team));
-  });
-
-  return map;
-}
-
-function normalizeActionLabel(action) {
-  const map = {
-    "short_pass": "Короткий пас",
-    "medium_pass": "Средний пас",
-    "long_pass": "Длинный пас",
-    "naves": "Навес",
-    "corner_pass": "Угловой",
-    "dribling": "Дриблинг",
-    "pass": "Пас",
-    "удар": "Удар",
-    "пенальти": "Пенальти",
-    "medium_shot": "Средний удар",
-    "long_shot": "Дальний удар",
-    "нарушение": "Нарушение",
-    "розыгрыш": "Розыгрыш"
-  };
-  return map[action] || action || "Эпизод";
-}
-
-function getResultLabel(value) {
-  if (value === true) return "Успех";
-  if (value === false) return "Провал";
-  if (value === "" || value === undefined) return "-";
-  return String(value);
-}
-
-function makeDisplayName(player) {
-  return player ? player.name : "-";
-}
-
 function clampCoord(row, col) {
   const rawRow = Number(row);
   const rawCol = Number(col);
@@ -473,94 +330,6 @@ function clonePlayersById(playersById) {
     clone[playerId] = { ...playersById[playerId] };
   });
   return clone;
-}
-
-function buildSnapshots(events, teams, teamByPlayerId) {
-  const snapshots = [];
-  const knownPlayersById = {};
-
-  const defaultTeams = {
-    home: teams[0] || "Команда 1",
-    away: teams[1] || "Команда 2"
-  };
-
-  for (let index = 0; index < events.length; index++) {
-    const event = events[index];
-    const actor = parsePlayerValue(event.player_with_ball);
-    const target = parsePlayerValue(event.target);
-    const opponent = parsePlayerValue(event.opponent);
-    const framePlayers = {};
-    const team = normalizeText(event.team);
-    const actorTeam = actor && actor.id && teamByPlayerId[actor.id] ? teamByPlayerId[actor.id] : team;
-    const action = String(event.action || "").toLowerCase();
-    const isKickoff = action === "розыгрыш";
-    const isPenalty = action === "пенальти";
-    const localPoint = getEventPoint(event);
-    const nextEvent = events[index + 1] || null;
-    const nextLocalPoint = nextEvent ? getEventPoint(nextEvent) : null;
-    const previousFocusPoint = snapshots.length ? snapshots[snapshots.length - 1].focusPoint : null;
-    const kickoffPoint = toGlobalCoord(nextLocalPoint, team, teams);
-    const coordsPair = getCoordsPair(event);
-    let currentPoint = isKickoff
-      ? (kickoffPoint || KICKOFF_POINT)
-      : (
-        isPenalty
-          ? getPenaltySpot(team, teams)
-          : (toGlobalCoord(localPoint, team, teams) || START_COORD_FALLBACK)
-      );
-
-    if (isCornerKickNavesEvent(event)) {
-      currentPoint = getCornerKickPasserPoint({ event }, coordsPair.to || localPoint || currentPoint);
-    } else if (isCornerPassEvent(event) && !localPoint) {
-      currentPoint = getCornerKickPasserPoint({ event }, previousFocusPoint || currentPoint);
-    }
-    const previousPlayersById = clonePlayersById(knownPlayersById);
-
-    if (actor) {
-      const actorState = makePlayerState(actor, actorTeam, currentPoint[0], currentPoint[1], "ball", event.index, defaultTeams.home);
-      if (isCornerKickNavesEvent(event)) {
-        actorState.isCornerPasser = true;
-      }
-      framePlayers[actor.id || `actor_${event.index}`] = actorState;
-      if (actor.id) {
-        knownPlayersById[actor.id] = actorState;
-      }
-    }
-
-    if (target && target.id && coordsPair.to && isPassAction(action)) {
-      const targetTeam = teamByPlayerId[target.id] || team;
-      const targetPoint = isCornerKickNavesEvent(event) && nextLocalPoint
-        ? nextLocalPoint
-        : (isCornerKickNavesEvent(event) && coordsPair.from ? coordsPair.from : coordsPair.to);
-      knownPlayersById[target.id] = makePlayerState(target, targetTeam, targetPoint[0], targetPoint[1], "target", event.index, targetTeam);
-    }
-
-    if (opponent && opponent.id && isCornerKickNavesEvent(event) && nextLocalPoint) {
-      const opponentTeam = teamByPlayerId[opponent.id] || getOtherTeam(team);
-      knownPlayersById[opponent.id] = makePlayerState(opponent, opponentTeam, nextLocalPoint[0], nextLocalPoint[1], "opponent", event.index, opponentTeam);
-    }
-
-    if (target && target.id && isCornerPassEvent(event) && isNavesShotEvent(nextEvent)) {
-      const targetTeam = teamByPlayerId[target.id] || team;
-      const targetPoint = getCornerReceptionPoint(currentPoint) || currentPoint;
-      knownPlayersById[target.id] = makePlayerState(target, targetTeam, targetPoint[0], targetPoint[1], "target", event.index, targetTeam);
-    }
-
-    if (opponent && opponent.id && coordsPair.to && isFailedPassResult(event.result)) {
-      const opponentTeam = teamByPlayerId[opponent.id] || getOtherTeam(team);
-      knownPlayersById[opponent.id] = makePlayerState(opponent, opponentTeam, coordsPair.to[0], coordsPair.to[1], "opponent", event.index, opponentTeam);
-    }
-
-    snapshots.push({
-      event,
-      players: framePlayers,
-      playersById: clonePlayersById(knownPlayersById),
-      previousPlayersById,
-      focusPoint: currentPoint
-    });
-  }
-
-  return snapshots;
 }
 
 function getTeamSide(teamName) {
@@ -657,95 +426,8 @@ function scheduleFieldLayoutRefresh() {
   });
 }
 
-function isPassAction(action) {
-  return action === "pass"
-    || action === "short_pass"
-    || action === "medium_pass"
-    || action === "long_pass"
-    || action === "naves"
-    || action === "corner_pass"
-    || action === "prostrel"
-    || action === "пас"
-    || action === "короткий пас"
-    || action === "средний пас"
-    || action === "длинный пас"
-    || action === "навес"
-    || action === "угловой"
-    || action === "прострел";
-}
-
-function isShotAction(action) {
-  return action === "удар"
-    || action === "пенальти"
-    || action === "medium_shot"
-    || action === "long_shot"
-    || action === "средний удар"
-    || action === "дальний удар";
-}
-
-function isSubstitutionAction(action) {
-  return action === "замена";
-}
-
-function isDribbleAction(action) {
-  return action === "dribling"
-    || action === "дриблинг";
-}
-
-function isFoulAction(action) {
-  return action === "нарушение"
-    || action === "foul"
-    || action === "violation";
-}
-
-function getSnapshotAction(snapshot) {
-  return String((snapshot && snapshot.event && snapshot.event.action) || "").toLowerCase();
-}
-
-function isZeroLikeResult(result) {
-  return result === 0
-    || result === false
-    || result === "0";
-}
-
-function isFailedPassResult(result) {
-  return isZeroLikeResult(result)
-    || result === 7
-    || result === "7";
-}
-
-function samePlayer(leftPlayer, rightPlayer) {
-  if (!leftPlayer || !rightPlayer) {
-    return false;
-  }
-
-  if (leftPlayer.id && rightPlayer.id) {
-    return leftPlayer.id === rightPlayer.id;
-  }
-
-  return normalizeText(leftPlayer.name) === normalizeText(rightPlayer.name);
-}
-
 function getOtherTeam(teamName) {
   return state.teams.find((item) => item !== teamName) || teamName;
-}
-
-function isCornerKickNavesShotEvent(event) {
-  return normalizeText(event && event.mixed_action).toLowerCase().includes("cornerkick_naves_shot");
-}
-
-function isCornerKickNavesEvent(event) {
-  return normalizeText(event && event.mixed_action).toLowerCase() === "cornerkick_naves";
-}
-
-function isCornerPassEvent(event) {
-  const action = String((event && event.action) || "").toLowerCase();
-  return action === "corner_pass" || action === "угловой";
-}
-
-function isNavesShotEvent(event) {
-  const mixedAction = normalizeText(event && event.mixed_action).toLowerCase();
-  return mixedAction === "naves_shot";
 }
 
 function getShotGoalPoint(teamName) {
@@ -1254,38 +936,6 @@ function getFoulContestMarkers(currentSnapshot, previousSnapshot, nextSnapshot, 
   }
 
   return markers;
-}
-
-function buildScore(events, teams) {
-  const score = [0, 0];
-  const home = normalizeText(teams[0]);
-  const away = normalizeText(teams[1]);
-
-  events.forEach((event) => {
-    const action = String(event.action || "").toLowerCase();
-    const team = normalizeText(event.team);
-    const isGoal = isShotAction(action) && (
-      event.result === 1
-      || event.result === true
-      || event.result === "1"
-    );
-
-    if (!isGoal) {
-      return;
-    }
-
-    if (team === home) {
-      score[0] += 1;
-    } else if (team === away) {
-      score[1] += 1;
-    }
-  });
-
-  return score;
-}
-
-function buildScoreUntilIndex(events, teams, endExclusive) {
-  return buildScore(events.slice(0, Math.max(0, endExclusive)), teams);
 }
 
 function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "") {
@@ -2066,7 +1716,7 @@ async function parseMatchPage() {
       events,
       extractPositionByPlayerName(pageDoc || logDoc)
     );
-    state.snapshots = buildSnapshots(events, state.teams, state.teamByPlayerId);
+    state.snapshots = buildSnapshots(events, state.teams, state.teamByPlayerId, state.playerPositionById);
 
     fillSummary();
     enableTimeline();
