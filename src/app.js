@@ -1,14 +1,20 @@
 import {
   FIELD_COLS,
   FIELD_ROWS,
-  FOOTTER_PROXY_MATCH_URL,
   KICKOFF_POINT,
   START_COORD_FALLBACK,
   TEAM_COLORS
 } from "./constants.js";
 import { coerceValue, divhistKeyMap, parsePrevPassValue } from "./parsers/events.js";
 import { parseNamedIdReference, parsePlayerIdReference, parsePlayerValue } from "./parsers/players.js";
-import { normalizeText, slugifyKey, toAbsoluteUrl } from "./utils/text.js";
+import {
+  buildHostedRemoteFetchMessage,
+  extractMatchLogUrl,
+  fetchWithFallbacks,
+  parseHtml,
+  readFileText
+} from "./services/footter-loader.js";
+import { normalizeText, slugifyKey } from "./utils/text.js";
 
 const urlInput = document.getElementById("urlInput");
 const loadButton = document.getElementById("loadButton");
@@ -200,96 +206,6 @@ function divhistToEvent(element, index) {
   return event;
 }
 
-
-function extractMatchLogUrl(doc, pageUrl) {
-  const fullLog = doc.querySelector("#full_log");
-  if (fullLog && normalizeText(fullLog.textContent)) {
-    return pageUrl;
-  }
-
-  const scriptText = Array.from(doc.scripts).map((script) => script.textContent || "").join("\n");
-  const fromScript = scriptText.match(/['"](?<path>\/match_log\/\d+\/?)['"]/i);
-  if (fromScript && fromScript.groups && fromScript.groups.path) {
-    return toAbsoluteUrl(fromScript.groups.path, pageUrl);
-  }
-
-  const fromMatchUrl = pageUrl.match(/\/match\/(\d+)\/?/i);
-  if (fromMatchUrl) {
-    return toAbsoluteUrl(`/match_log/${fromMatchUrl[1]}/`, pageUrl);
-  }
-
-  const directMatchLog = pageUrl.match(/\/match_log\/\d+\/?/i);
-  return directMatchLog ? pageUrl : null;
-}
-
-async function fetchText(url) {
-  const response = await fetch(url, { credentials: "omit" });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return response.text();
-}
-
-async function fetchWithFallbacks(url) {
-  const candidates = [
-    { label: "getsky-proxy", url: `${FOOTTER_PROXY_MATCH_URL}?url=${encodeURIComponent(url)}`, reader: "text" },
-    { label: "direct", url, reader: "text" },
-    { label: "allorigins-json", url: `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, reader: "allorigins" },
-    { label: "allorigins-raw", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, reader: "text" },
-    { label: "corsproxy", url: `https://corsproxy.io/?url=${encodeURIComponent(url)}`, reader: "text" }
-  ];
-
-  const errors = [];
-  for (const candidate of candidates) {
-    try {
-      const text = await fetchCandidateText(candidate);
-      return { text, resolvedVia: candidate.label };
-    } catch (error) {
-      errors.push(`${candidate.label}: ${error.message}`);
-    }
-  }
-
-  throw new Error(`Не удалось загрузить страницу. ${errors.join(" | ")}`);
-}
-
-async function fetchCandidateText(candidate) {
-  const response = await fetch(candidate.url, { credentials: "omit" });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-
-  if (candidate.reader === "allorigins") {
-    const payload = await response.json();
-    if (!payload || typeof payload.contents !== "string" || !payload.contents.trim()) {
-      throw new Error("Empty response body");
-    }
-    return payload.contents;
-  }
-
-  return response.text();
-}
-
-function buildHostedRemoteFetchMessage(errorMessage) {
-  const isFileProtocol = window.location.protocol === "file:";
-  const isHostedApp = !isFileProtocol && !/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || "");
-  const hint = isFileProtocol
-    ? "\u0421\u0442\u0440\u0430\u043d\u0438\u0446\u0430 \u043e\u0442\u043a\u0440\u044b\u0442\u0430 \u043a\u0430\u043a file://, \u0438 \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u0431\u043b\u043e\u043a\u0438\u0440\u0443\u0435\u0442 \u043f\u0440\u044f\u043c\u043e\u0439 fetch \u043d\u0430 footter."
-    : (isHostedApp
-      ? "\u041d\u0430 \u0434\u043e\u043c\u0435\u043d\u0435 direct-fetch \u0443\u043f\u0438\u0440\u0430\u0435\u0442\u0441\u044f \u0432 CORS. \u0412 \u044d\u0442\u043e\u043c \u0440\u0435\u0436\u0438\u043c\u0435 \u043e\u0441\u043d\u043e\u0432\u043d\u0430\u044f \u043d\u0430\u0434\u0435\u0436\u0434\u0430 \u2014 `getsky.tech/footter_proxy_match`, \u0430 \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u044b\u0435 CORS-\u043f\u0440\u043e\u043a\u0441\u0438 \u0438\u0434\u0443\u0442 \u0442\u043e\u043b\u044c\u043a\u043e \u043a\u0430\u043a fallback."
-      : "\u041f\u0440\u044f\u043c\u043e\u0439 fetch \u043d\u0430 footter \u043c\u043e\u0436\u0435\u0442 \u0431\u044b\u0442\u044c \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d CORS-\u043f\u043e\u043b\u0438\u0442\u0438\u043a\u043e\u0439 \u0438\u043b\u0438 \u043f\u0440\u043e\u043a\u0441\u0438 \u043d\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d.");
-  return `\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u043f\u043e \u0441\u0441\u044b\u043b\u043a\u0435. ${hint} \u0421\u0430\u043c\u044b\u0439 \u043d\u0430\u0434\u0451\u0436\u043d\u044b\u0439 \u0432\u0430\u0440\u0438\u0430\u043d\u0442: \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0439 HTML \u043c\u0430\u0442\u0447\u0430 \u0438\u043b\u0438 match_log. ${errorMessage}`;
-}
-
-function parseHtml(html) {
-  return new DOMParser().parseFromString(html, "text/html");
-}
-
-async function readFileText(file) {
-  if (!file) {
-    return "";
-  }
-  return file.text();
-}
 
 function renderFullLog(fullLog) {
   const divhistNodes = Array.from(fullLog.querySelectorAll(".divhist, div[id*='divhist'], div[class*='divhist']"));
