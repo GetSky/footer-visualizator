@@ -21,6 +21,7 @@ const moduleAssets = [
   "src/services/footter-loader.js",
   "src/parsers/players.js",
   "src/parsers/events.js",
+  "src/field/geometry.js",
   "src/match/actions.js",
   "src/match/players.js",
   "src/match/teams.js",

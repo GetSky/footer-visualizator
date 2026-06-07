@@ -1,8 +1,6 @@
 import {
   FIELD_COLS,
   FIELD_ROWS,
-  KICKOFF_POINT,
-  START_COORD_FALLBACK,
   TEAM_COLORS
 } from "./constants.js";
 import { coerceValue, divhistKeyMap, parsePrevPassValue } from "./parsers/events.js";
@@ -25,6 +23,15 @@ import {
   normalizeActionLabel,
   samePlayer
 } from "./match/actions.js";
+import {
+  clampCoord,
+  coordToPercent,
+  getCoordsPair,
+  getCornerKickPasserPoint,
+  getCornerReceptionPoint,
+  getEventPoint,
+  getShotGoalPoint
+} from "./field/geometry.js";
 import {
   buildPlayerInfoById,
   buildPlayerPositionById,
@@ -255,48 +262,6 @@ function getInitialSourceLabel(pageUrl, pageFile) {
   return "-";
 }
 
-function clampCoord(row, col) {
-  const rawRow = Number(row);
-  const rawCol = Number(col);
-  const safeRow = Math.max(1, Math.min(FIELD_ROWS, Number.isFinite(rawRow) ? rawRow : START_COORD_FALLBACK[0]));
-  const safeCol = Math.max(1, Math.min(FIELD_COLS, Number.isFinite(rawCol) ? rawCol : START_COORD_FALLBACK[1]));
-  return [safeRow, safeCol];
-}
-
-function getCoordsPair(event) {
-  const coords = Array.isArray(event.position) ? event.position : [];
-  if (coords.length >= 2) {
-    return {
-      from: clampCoord(coords[0][0], coords[0][1]),
-      to: clampCoord(coords[1][0], coords[1][1])
-    };
-  }
-
-  if (coords.length === 1) {
-    const point = clampCoord(coords[0][0], coords[0][1]);
-    return { from: point, to: point };
-  }
-
-  return { from: null, to: null };
-}
-
-function getEventPoint(event) {
-  const coords = Array.isArray(event.position) ? event.position : [];
-  if (coords.length === 0) {
-    return null;
-  }
-
-  return clampCoord(coords[0][0], coords[0][1]);
-}
-
-function toGlobalCoord(coord, teamName, teams) {
-  if (!coord) {
-    return null;
-  }
-
-  return clampCoord(coord[0], coord[1]);
-}
-
 function getPlayerMarkerLabel(player) {
   if (player && player.id && state.playerPositionById[player.id]) {
     return state.playerPositionById[player.id];
@@ -319,19 +284,6 @@ function makePlayerState(player, team, row, col, role, index, fallbackColor) {
   };
 }
 
-function getPenaltySpot(teamName, teams) {
-  const teamIndex = teams.indexOf(normalizeText(teamName));
-  return teamIndex === 1 ? [2, 2.5] : [13, 2.5];
-}
-
-function clonePlayersById(playersById) {
-  const clone = {};
-  Object.keys(playersById).forEach((playerId) => {
-    clone[playerId] = { ...playersById[playerId] };
-  });
-  return clone;
-}
-
 function getTeamSide(teamName) {
   const index = state.teams.indexOf(teamName);
   return TEAM_COLORS[index] || "home";
@@ -341,22 +293,6 @@ function formatTeamName(teamName) {
   const side = getTeamSide(teamName);
   const className = side === "away" ? "team-away" : "team-home";
   return `<span class="${className}">${teamName || "-"}</span>`;
-}
-
-function coordToPercent(row, col, options = {}) {
-  const [baseRow, baseCol] = clampCoord(row, col);
-  const rawRow = Number(row);
-  const rawCol = Number(col);
-  const safeRow = options.allowOuterRows && Number.isFinite(rawRow)
-    ? Math.max(0.5, Math.min(FIELD_ROWS + 0.5, rawRow))
-    : baseRow;
-  const safeCol = options.allowOuterCols && Number.isFinite(rawCol)
-    ? Math.max(0.5, Math.min(FIELD_COLS + 0.5, rawCol))
-    : baseCol;
-  return {
-    x: ((safeRow - 0.5) / FIELD_ROWS) * 100,
-    y: ((safeCol - 0.5) / FIELD_COLS) * 100
-  };
 }
 
 function createFieldLabels() {
@@ -430,11 +366,6 @@ function getOtherTeam(teamName) {
   return state.teams.find((item) => item !== teamName) || teamName;
 }
 
-function getShotGoalPoint(teamName) {
-  const isAway = getTeamSide(normalizeText(teamName)) === "away";
-  return [isAway ? 0.5 : FIELD_ROWS + 0.5, (FIELD_COLS + 1) / 2];
-}
-
 function getShotGoalkeeperMarker(snapshot) {
   if (!snapshot || !snapshot.event || !isShotAction(getSnapshotAction(snapshot))) {
     return null;
@@ -442,7 +373,7 @@ function getShotGoalkeeperMarker(snapshot) {
 
   const shotTeam = normalizeText(snapshot.event.team);
   const goalkeeperTeam = getOtherTeam(shotTeam);
-  const point = getShotGoalPoint(shotTeam);
+  const point = getShotGoalPoint(shotTeam, state.teams);
   const goalkeeper = parsePlayerValue(snapshot.event.opponent) || {
     id: `goalkeeper:${goalkeeperTeam || "defense"}`,
     name: "Вратарь",
@@ -509,34 +440,6 @@ function resolvePlayerById(playerId, snapshot) {
   };
 }
 
-function getCornerKickPasserPoint(snapshot, sourcePoint = null) {
-  const shotPoint = sourcePoint || (snapshot && snapshot.focusPoint ? snapshot.focusPoint : START_COORD_FALLBACK);
-  const teamName = normalizeText(snapshot && snapshot.event && snapshot.event.team);
-  const teamIndex = state.teams.indexOf(teamName);
-  const attackingRow = teamIndex === 1
-    ? 1
-    : (teamIndex === 0 ? FIELD_ROWS : (shotPoint[0] > FIELD_ROWS / 2 ? FIELD_ROWS : 1));
-  const isFarTouchline = shotPoint[1] >= (FIELD_COLS + 1) / 2;
-  const attackingCol = teamIndex === 1
-    ? (isFarTouchline ? 1 : FIELD_COLS)
-    : (isFarTouchline ? FIELD_COLS : 1);
-  return [
-    attackingRow === 1 ? 0.5 : FIELD_ROWS + 0.5,
-    attackingCol === 1 ? 0.5 : FIELD_COLS + 0.5
-  ];
-}
-
-function getCornerReceptionPoint(cornerPoint) {
-  if (!cornerPoint) {
-    return null;
-  }
-
-  return [
-    cornerPoint[0] <= 1 ? 1 : FIELD_ROWS,
-    cornerPoint[1] <= 1 ? 1 : FIELD_COLS
-  ];
-}
-
 function getCornerKickPassInfo(snapshot, sourcePoint = null) {
   if (!snapshot || !isCornerKickNavesShotEvent(snapshot.event)) {
     return null;
@@ -548,7 +451,7 @@ function getCornerKickPassInfo(snapshot, sourcePoint = null) {
     || parseNamedIdReference(snapshot.event.mixed_action, "prev_pm")
     || parseNamedIdReference(snapshot.event.raw_text, "prev_pm");
   const previousState = passerId && snapshot.previousPlayersById ? snapshot.previousPlayersById[passerId] : null;
-  const fromPoint = getCornerKickPasserPoint(snapshot, sourcePoint);
+  const fromPoint = getCornerKickPasserPoint(snapshot, state.teams, sourcePoint);
   const toPoint = snapshot.focusPoint || (
     prevPass.coords[1]
       ? clampCoord(prevPass.coords[1][0], prevPass.coords[1][1])
@@ -600,7 +503,7 @@ function getRegularCornerPassInfo(snapshot, sourcePoint = null, nextSnapshot = n
   const passer = parsePlayerValue(snapshot.event.player_with_ball);
   const target = parsePlayerValue(snapshot.event.target);
   const toPoint = getEventPoint(snapshot.event) || sourcePoint || snapshot.focusPoint;
-  const fromPoint = getCornerKickPasserPoint(snapshot, toPoint);
+  const fromPoint = getCornerKickPasserPoint(snapshot, state.teams, toPoint);
   const targetPoint = nextSnapshot && isNavesShotEvent(nextSnapshot.event)
     ? getCornerReceptionPoint(fromPoint)
     : toPoint;
