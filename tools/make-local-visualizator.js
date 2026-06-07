@@ -17,6 +17,10 @@ const moduleOrder = [
   "src/services/footter-loader.js",
   "src/parsers/players.js",
   "src/parsers/events.js",
+  "src/match/actions.js",
+  "src/match/players.js",
+  "src/match/teams.js",
+  "src/match/snapshots.js",
   "src/app.js",
 ];
 
