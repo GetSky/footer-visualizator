@@ -14,6 +14,7 @@ const html = fs.readFileSync(sourcePath, "utf8");
 const moduleOrder = [
   "src/constants.js",
   "src/utils/text.js",
+  "src/services/footter-loader.js",
   "src/parsers/players.js",
   "src/parsers/events.js",
   "src/app.js",
