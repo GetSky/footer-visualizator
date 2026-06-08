@@ -1,8 +1,4 @@
-import {
-  FIELD_COLS,
-  FIELD_ROWS,
-  TEAM_COLORS
-} from "./constants.js";
+import { TEAM_COLORS } from "./constants.js";
 import { coerceValue, divhistKeyMap, parsePrevPassValue } from "./parsers/events.js";
 import {
   buildScore,
@@ -48,47 +44,48 @@ import {
   parseHtml,
   readFileText
 } from "./services/footter-loader.js";
+import { createFieldLayout } from "./render/field-layout.js";
+import { getDomElements } from "./ui/dom.js";
+import { createModalController } from "./ui/modals.js";
+import { createProgressController } from "./ui/progress.js";
 import { normalizeText, slugifyKey } from "./utils/text.js";
 
-const urlInput = document.getElementById("urlInput");
-const loadButton = document.getElementById("loadButton");
-const localSourceGrid = document.getElementById("localSourceGrid");
-const pageFileInput = document.getElementById("pageFileInput");
-const playButton = document.getElementById("playButton");
-const prevButton = document.getElementById("prevButton");
-const nextButton = document.getElementById("nextButton");
-const speedSelect = document.getElementById("speedSelect");
-const timelineRange = document.getElementById("timelineRange");
-const timelineLabel = document.getElementById("timelineLabel");
-const episodeInfoButton = document.getElementById("episodeInfoButton");
-const episodeModalBackdrop = document.getElementById("episodeModalBackdrop");
-const episodeModalClose = document.getElementById("episodeModalClose");
-const eventListModalBackdrop = document.getElementById("eventListModalBackdrop");
-const eventListModalClose = document.getElementById("eventListModalClose");
-const teamsLabel = document.getElementById("teamsLabel");
-const matchMinute = document.getElementById("matchMinute");
-const fieldPanel = document.querySelector(".field-panel");
-const fieldApron = document.querySelector(".field-apron");
-const field = document.getElementById("field");
-const currentLogCard = document.getElementById("currentLogCard");
-const currentLogText = document.getElementById("currentLogText");
-const trailLayer = document.getElementById("trailLayer");
-const markerLayer = document.getElementById("markerLayer");
-const eventList = document.getElementById("eventList");
-const eventClock = document.getElementById("eventClock");
-const eventAction = document.getElementById("eventAction");
-const eventResult = document.getElementById("eventResult");
-const eventTeam = document.getElementById("eventTeam");
-const eventBallPlayer = document.getElementById("eventBallPlayer");
-const eventTarget = document.getElementById("eventTarget");
-const eventOpponent = document.getElementById("eventOpponent");
-const eventCoords = document.getElementById("eventCoords");
-const statusNode = document.getElementById("status");
-const progressNode = document.getElementById("progress");
-const progressDetailNode = document.getElementById("progressDetail");
-const progressFillNode = document.getElementById("progressFill");
-const progressStepsNode = document.getElementById("progressSteps");
-
+const elements = getDomElements();
+const {
+  urlInput,
+  loadButton,
+  localSourceGrid,
+  pageFileInput,
+  playButton,
+  prevButton,
+  nextButton,
+  speedSelect,
+  timelineRange,
+  timelineLabel,
+  episodeInfoButton,
+  episodeModalBackdrop,
+  episodeModalClose,
+  eventListModalBackdrop,
+  eventListModalClose,
+  teamsLabel,
+  matchMinute,
+  fieldPanel,
+  field,
+  currentLogCard,
+  currentLogText,
+  trailLayer,
+  markerLayer,
+  eventList,
+  eventClock,
+  eventAction,
+  eventResult,
+  eventTeam,
+  eventBallPlayer,
+  eventTarget,
+  eventOpponent,
+  eventCoords,
+  statusNode
+} = elements;
 const state = {
   events: [],
   text: "",
@@ -104,87 +101,31 @@ const state = {
 };
 
 let fieldResizeObserver = null;
-let progressSteps = [];
-let episodeModalPreviouslyFocused = null;
-let eventListModalPreviouslyFocused = null;
+const {
+  createProgressFlow,
+  updateProgress,
+  completeProgress,
+  failProgress
+} = createProgressController(elements);
 
+const {
+  createFieldLabels,
+  resizeField,
+  refreshFieldLayout,
+  scheduleFieldLayoutRefresh
+} = createFieldLayout(elements);
+
+const {
+  openEpisodeModal,
+  closeEpisodeModal,
+  openEventListModal,
+  closeEventListModal
+} = createModalController(elements, {
+  hasEvents: () => state.events.length > 0
+});
 function setStatus(message, isError) {
   statusNode.textContent = message;
   statusNode.className = isError ? "status error" : "status";
-}
-
-function renderProgressSteps() {
-  progressStepsNode.innerHTML = "";
-  progressSteps.forEach((step) => {
-    const item = document.createElement("div");
-    item.className = `progress-step ${step.state}`;
-
-    const textWrap = document.createElement("div");
-    const title = document.createElement("strong");
-    title.textContent = step.title;
-    const description = document.createElement("small");
-    description.textContent = step.description;
-
-    textWrap.append(title, description);
-    item.append(textWrap);
-    progressStepsNode.append(item);
-  });
-}
-
-function createProgressFlow(stepDefinitions) {
-  progressSteps = stepDefinitions.map((step) => ({
-    key: step.key,
-    title: step.title,
-    description: step.description,
-    state: "pending"
-  }));
-
-  progressNode.classList.add("visible");
-  progressDetailNode.textContent = "Подготавливаю загрузку...";
-  progressFillNode.style.width = "0%";
-  renderProgressSteps();
-}
-
-function updateProgress(stepKey, detail, status) {
-  const currentIndex = progressSteps.findIndex((step) => step.key === stepKey);
-  if (currentIndex === -1) {
-    if (detail) {
-      progressDetailNode.textContent = detail;
-    }
-    return;
-  }
-
-  progressSteps = progressSteps.map((step, index) => {
-    if (step.state === "error" && index !== currentIndex) {
-      return step;
-    }
-    if (index < currentIndex && step.state !== "error") {
-      return { ...step, state: "done" };
-    }
-    if (index === currentIndex) {
-      return { ...step, state: status || "active" };
-    }
-    return { ...step, state: "pending" };
-  });
-
-  const completedSteps = progressSteps.filter((step) => step.state === "done").length;
-  const activeStep = progressSteps[currentIndex];
-  const progressValue = ((completedSteps + (activeStep && activeStep.state === "active" ? 0.5 : 1)) / Math.max(progressSteps.length, 1)) * 100;
-
-  progressDetailNode.textContent = detail || "";
-  progressFillNode.style.width = `${Math.max(4, Math.min(progressValue, 100))}%`;
-  renderProgressSteps();
-}
-
-function completeProgress(detail) {
-  progressSteps = progressSteps.map((step) => ({ ...step, state: "done" }));
-  progressDetailNode.textContent = detail;
-  progressFillNode.style.width = "100%";
-  renderProgressSteps();
-}
-
-function failProgress(stepKey, detail) {
-  updateProgress(stepKey, detail, "error");
 }
 
 function splitDivhistLines(element) {
@@ -293,73 +234,6 @@ function formatTeamName(teamName) {
   const side = getTeamSide(teamName);
   const className = side === "away" ? "team-away" : "team-home";
   return `<span class="${className}">${teamName || "-"}</span>`;
-}
-
-function createFieldLabels() {
-  Array.from(field.querySelectorAll(".cell-label")).forEach((node) => node.remove());
-
-  for (let row = 1; row <= FIELD_ROWS; row++) {
-    const label = document.createElement("div");
-    label.className = "cell-label";
-    const pos = coordToPercent(row, 1);
-    label.textContent = String(row);
-    label.style.left = `${pos.x}%`;
-    label.style.bottom = "10px";
-    label.style.transform = "translateX(-50%)";
-    field.appendChild(label);
-  }
-
-  for (let col = 1; col <= FIELD_COLS; col++) {
-    const label = document.createElement("div");
-    label.className = "cell-label";
-    const pos = coordToPercent(1, col);
-    label.textContent = String(col);
-    label.style.left = "12px";
-    label.style.top = `${pos.y}%`;
-    label.style.transform = "translateY(-50%)";
-    field.appendChild(label);
-  }
-}
-
-function resizeField() {
-  if (!fieldPanel || !field) {
-    return;
-  }
-
-  const panelRect = fieldPanel.getBoundingClientRect();
-  const apronRect = fieldApron ? fieldApron.getBoundingClientRect() : null;
-  const apronStyle = fieldApron ? getComputedStyle(fieldApron) : null;
-  const fieldStyle = getComputedStyle(field);
-  const apronPaddingX = apronStyle
-    ? parseFloat(apronStyle.paddingLeft) + parseFloat(apronStyle.paddingRight)
-    : 0;
-  const fieldBorderX = parseFloat(fieldStyle.borderLeftWidth) + parseFloat(fieldStyle.borderRightWidth);
-  const fieldBorderY = parseFloat(fieldStyle.borderTopWidth) + parseFloat(fieldStyle.borderBottomWidth);
-  const availableOuterWidth = apronRect && apronRect.width
-    ? apronRect.width
-    : Math.min(panelRect.width, 998);
-  const availableWidth = Math.max(260, availableOuterWidth - apronPaddingX);
-  const nextContentWidth = Math.max(FIELD_ROWS * 18, Math.floor((availableWidth - fieldBorderX) / FIELD_ROWS) * FIELD_ROWS);
-  const nextWidth = nextContentWidth + fieldBorderX;
-  const nextContentHeight = nextContentWidth * (FIELD_COLS / (FIELD_ROWS / 2));
-  const nextHeight = nextContentHeight + fieldBorderY;
-
-  field.style.width = `${nextWidth}px`;
-  field.style.height = `${nextHeight}px`;
-}
-
-function refreshFieldLayout() {
-  resizeField();
-  createFieldLabels();
-}
-
-function scheduleFieldLayoutRefresh() {
-  requestAnimationFrame(() => {
-    refreshFieldLayout();
-    requestAnimationFrame(() => {
-      refreshFieldLayout();
-    });
-  });
 }
 
 function getOtherTeam(teamName) {
@@ -1258,56 +1132,6 @@ function sanitizeEventHtml(rawHtml) {
 
 function stripLeadingCoordsPrefix(rawHtml) {
   return String(rawHtml || "").replace(/^\s*\[[^\[\]]+\]\s*/, "");
-}
-
-function openEpisodeModal() {
-  if (!state.snapshots.length) {
-    return;
-  }
-
-  episodeModalPreviouslyFocused = document.activeElement;
-  episodeModalBackdrop.classList.add("open");
-  episodeModalBackdrop.setAttribute("aria-hidden", "false");
-  episodeModalClose.focus();
-}
-
-function closeEpisodeModal() {
-  if (!episodeModalBackdrop.classList.contains("open")) {
-    return;
-  }
-
-  episodeModalBackdrop.classList.remove("open");
-  episodeModalBackdrop.setAttribute("aria-hidden", "true");
-
-  if (episodeModalPreviouslyFocused && typeof episodeModalPreviouslyFocused.focus === "function") {
-    episodeModalPreviouslyFocused.focus();
-  }
-  episodeModalPreviouslyFocused = null;
-}
-
-function openEventListModal() {
-  if (!state.events.length) {
-    return;
-  }
-
-  eventListModalPreviouslyFocused = document.activeElement;
-  eventListModalBackdrop.classList.add("open");
-  eventListModalBackdrop.setAttribute("aria-hidden", "false");
-  eventListModalClose.focus();
-}
-
-function closeEventListModal() {
-  if (!eventListModalBackdrop.classList.contains("open")) {
-    return;
-  }
-
-  eventListModalBackdrop.classList.remove("open");
-  eventListModalBackdrop.setAttribute("aria-hidden", "true");
-
-  if (eventListModalPreviouslyFocused && typeof eventListModalPreviouslyFocused.focus === "function") {
-    eventListModalPreviouslyFocused.focus();
-  }
-  eventListModalPreviouslyFocused = null;
 }
 
 function renderEventCard(snapshot) {
