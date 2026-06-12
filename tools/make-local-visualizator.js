@@ -26,6 +26,7 @@ const moduleOrder = [
   "src/match/players.js",
   "src/match/teams.js",
   "src/match/snapshots.js",
+  "src/app/bootstrap.js",
   "src/app.js",
 ];
 
