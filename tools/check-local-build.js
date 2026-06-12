@@ -30,6 +30,7 @@ const moduleAssets = [
   "src/match/players.js",
   "src/match/teams.js",
   "src/match/snapshots.js",
+  "src/app/bootstrap.js",
 ];
 
 const requiredAssets = [...htmlAssets, ...moduleAssets];
@@ -71,6 +72,21 @@ for (const asset of moduleAssets) {
 
 if (localHtml.includes('type="module"') || localHtml.includes("../src/app.js")) {
   throw new Error("Local HTML must inline JavaScript for file:// module compatibility");
+}
+
+const localParseMatchPageIndex = localHtml.indexOf("async function parseMatchPage");
+const localWireAppEventsIndex = localHtml.indexOf("wireAppEvents({");
+
+if (localParseMatchPageIndex === -1) {
+  throw new Error("Local HTML does not define parseMatchPage");
+}
+
+if (localWireAppEventsIndex === -1) {
+  throw new Error("Local HTML does not wire app events");
+}
+
+if (localParseMatchPageIndex > localWireAppEventsIndex) {
+  throw new Error("Local HTML wires app events before parseMatchPage is defined");
 }
 
 for (const asset of ["src/app.js", ...moduleAssets]) {

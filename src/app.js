@@ -1,4 +1,5 @@
 import { TEAM_COLORS } from "./constants.js";
+import { initializeApp, wireAppEvents } from "./app/bootstrap.js";
 import { coerceValue, divhistKeyMap, parsePrevPassValue } from "./parsers/events.js";
 import {
   buildScore,
@@ -100,7 +101,6 @@ const state = {
   markerNodes: {}
 };
 
-let fieldResizeObserver = null;
 const {
   createProgressFlow,
   updateProgress,
@@ -1314,28 +1314,6 @@ function enableTimeline() {
   timelineRange.value = "0";
 }
 
-function normalizeMatchQueryValue(value) {
-  const trimmedValue = value.trim();
-  if (/^\d+$/.test(trimmedValue)) {
-    return `https://footter.com/match/${trimmedValue}/`;
-  }
-  return trimmedValue;
-}
-
-function getMatchUrlFromQuery() {
-  const params = new URLSearchParams(window.location.search);
-  const queryValue = params.get("url") || params.get("match_url") || params.get("match");
-  return queryValue ? normalizeMatchQueryValue(queryValue) : "";
-}
-
-function isLocalResourceLaunch() {
-  return window.location.protocol === "file:" || window.location.protocol === "res:";
-}
-
-function syncLocalSourceVisibility() {
-  localSourceGrid.classList.toggle("hidden", !isLocalResourceLaunch());
-}
-
 async function parseMatchPage() {
   const pageUrl = urlInput.value.trim();
   const pageFile = pageFileInput.files && pageFileInput.files[0] ? pageFileInput.files[0] : null;
@@ -1474,116 +1452,25 @@ async function parseMatchPage() {
   }
 }
 
-loadButton.addEventListener("click", parseMatchPage);
-urlInput.addEventListener("paste", () => {
-  setTimeout(() => {
-    if (urlInput.value.trim()) {
-      parseMatchPage();
-    }
-  }, 0);
-});
-pageFileInput.addEventListener("change", () => {
-  if (pageFileInput.files && pageFileInput.files[0]) {
-    parseMatchPage();
-  }
-});
-urlInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    parseMatchPage();
-  }
-});
-timelineLabel.addEventListener("click", openEventListModal);
-episodeInfoButton.addEventListener("click", openEpisodeModal);
-episodeModalClose.addEventListener("click", closeEpisodeModal);
-episodeModalBackdrop.addEventListener("click", (event) => {
-  if (event.target === episodeModalBackdrop) {
-    closeEpisodeModal();
-  }
-});
-eventListModalClose.addEventListener("click", closeEventListModal);
-eventListModalBackdrop.addEventListener("click", (event) => {
-  if (event.target === eventListModalBackdrop) {
-    closeEventListModal();
-  }
-});
-function isTimelineShortcutTarget(target) {
-  if (!target) {
-    return false;
-  }
-  const tagName = target.tagName ? target.tagName.toLowerCase() : "";
-  return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
-}
-
-function moveTimelineBy(delta) {
-  if (!state.snapshots.length) {
-    return false;
-  }
-  const nextIndex = state.currentIndex + delta;
-  if (nextIndex < 0 || nextIndex >= state.snapshots.length) {
-    return false;
-  }
-  stopPlayback();
-  setCurrentIndex(nextIndex);
-  return true;
-}
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closeEpisodeModal();
-    closeEventListModal();
-    return;
-  }
-
-  if (event.altKey || event.ctrlKey || event.metaKey || isTimelineShortcutTarget(event.target)) {
-    return;
-  }
-
-  if (event.key === "ArrowLeft" && moveTimelineBy(-1)) {
-    event.preventDefault();
-  } else if (event.key === "ArrowRight" && moveTimelineBy(1)) {
-    event.preventDefault();
-  }
+wireAppEvents({
+  closeEpisodeModal,
+  closeEventListModal,
+  elements,
+  openEpisodeModal,
+  openEventListModal,
+  parseMatchPage,
+  schedulePlayback,
+  setCurrentIndex,
+  state,
+  stopPlayback
 });
 
-syncLocalSourceVisibility();
-
-const queryMatchUrl = getMatchUrlFromQuery();
-if (queryMatchUrl) {
-  urlInput.value = queryMatchUrl;
-  parseMatchPage();
-}
-
-playButton.addEventListener("click", () => {
-  if (state.timer) {
-    stopPlayback();
-  } else {
-    schedulePlayback();
-  }
+initializeApp({
+  createFieldLabels,
+  elements,
+  parseMatchPage,
+  refreshFieldLayout,
+  renderEventCard,
+  resizeField,
+  updateButtons
 });
-
-prevButton.addEventListener("click", () => {
-  moveTimelineBy(-1);
-});
-
-nextButton.addEventListener("click", () => {
-  moveTimelineBy(1);
-});
-
-timelineRange.addEventListener("input", () => {
-  stopPlayback();
-  setCurrentIndex(Number(timelineRange.value));
-});
-
-createFieldLabels();
-resizeField();
-renderEventCard(null);
-updateButtons();
-window.addEventListener("resize", () => {
-  refreshFieldLayout();
-});
-if ("ResizeObserver" in window) {
-  fieldResizeObserver = new ResizeObserver(() => {
-    refreshFieldLayout();
-  });
-  fieldResizeObserver.observe(fieldPanel);
-}
