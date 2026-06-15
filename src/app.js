@@ -99,7 +99,8 @@ const state = {
   snapshots: [],
   currentIndex: 0,
   timer: null,
-  markerNodes: {}
+  markerNodes: {},
+  actionLineKey: null
 };
 
 const {
@@ -619,8 +620,13 @@ function getPassTargetMarker(currentSnapshot, nextSnapshot) {
 }
 
 function getNextRenderableSnapshot(startIndex) {
+  const currentSourceIndex = getSnapshotSourceIndex(state.snapshots[startIndex], startIndex);
   for (let index = startIndex + 1; index < state.snapshots.length; index++) {
     const snapshot = state.snapshots[index];
+    if (getSnapshotSourceIndex(snapshot, index) === currentSourceIndex) {
+      continue;
+    }
+
     const action = String((snapshot && snapshot.event && snapshot.event.action) || "").toLowerCase();
     if (!isSubstitutionAction(action)) {
       return snapshot;
@@ -630,8 +636,13 @@ function getNextRenderableSnapshot(startIndex) {
 }
 
 function getPreviousRenderableSnapshot(startIndex) {
+  const currentSourceIndex = getSnapshotSourceIndex(state.snapshots[startIndex], startIndex);
   for (let index = startIndex - 1; index >= 0; index--) {
     const snapshot = state.snapshots[index];
+    if (getSnapshotSourceIndex(snapshot, index) === currentSourceIndex) {
+      continue;
+    }
+
     const action = String((snapshot && snapshot.event && snapshot.event.action) || "").toLowerCase();
     if (!isSubstitutionAction(action)) {
       return snapshot;
@@ -758,7 +769,26 @@ function appendActionLine(fromPoint, toPoint, isFailed, extraClass = "") {
   );
 }
 
+function getActionLineRenderKey(currentSnapshot, nextSnapshot) {
+  if (!currentSnapshot) {
+    return "";
+  }
+
+  const fieldRect = field.getBoundingClientRect();
+  return [
+    getSnapshotSourceIndex(currentSnapshot, state.currentIndex),
+    getSnapshotSourceIndex(nextSnapshot, -1),
+    Math.round(fieldRect.width),
+    Math.round(fieldRect.height)
+  ].join(":");
+}
+
 function renderActionLine(currentSnapshot, nextSnapshot) {
+  const actionLineKey = getActionLineRenderKey(currentSnapshot, nextSnapshot);
+  if (state.actionLineKey === actionLineKey) {
+    return;
+  }
+  state.actionLineKey = actionLineKey;
   trailLayer.innerHTML = "";
   if (!currentSnapshot) {
     return;
@@ -1135,6 +1165,91 @@ function stripLeadingCoordsPrefix(rawHtml) {
   return String(rawHtml || "").replace(/^\s*\[[^\[\]]+\]\s*/, "");
 }
 
+function htmlToPlainText(rawHtml) {
+  const doc = new DOMParser().parseFromString(`<div>${rawHtml || ""}</div>`, "text/html");
+  return normalizeText((doc.body.firstElementChild && doc.body.firstElementChild.textContent) || rawHtml || "");
+}
+
+function splitDescriptionSentences(rawHtml) {
+  const text = htmlToPlainText(stripLeadingCoordsPrefix(rawHtml));
+  if (!text) {
+    return [];
+  }
+
+  const matches = text.match(/[^.!?…]+(?:[.!?…]+(?=\s|$)|$)/g) || [];
+  const sentences = matches.map((sentence) => normalizeText(sentence)).filter(Boolean);
+  return sentences.length ? sentences : [text];
+}
+
+function getEventDescriptionText(event) {
+  return event.cue1 || event.raw_text || event.team || "";
+}
+
+function getEventSourceIndex(event, fallbackIndex) {
+  return event && event.sourceEventIndex !== undefined
+    ? event.sourceEventIndex
+    : (event && event.index !== undefined ? event.index : fallbackIndex);
+}
+
+function buildEventSentenceTimeline(events, baseSnapshots) {
+  const timelineEvents = [];
+  const timelineSnapshots = [];
+
+  events.forEach((event, eventIndex) => {
+    const baseSnapshot = baseSnapshots[eventIndex];
+    const sentences = splitDescriptionSentences(getEventDescriptionText(event));
+    const steps = sentences.length ? sentences : [stripLeadingCoordsPrefix(getEventDescriptionText(event)) || "Описание отсутствует."];
+    const sourceEventIndex = getEventSourceIndex(event, eventIndex);
+    const isGoal = isGoalEvent(event);
+
+    steps.forEach((sentence, sentenceIndex) => {
+      const isLastSentenceStep = sentenceIndex === steps.length - 1;
+      const stepEvent = {
+        ...event,
+        cue1: sentence,
+        sourceEventIndex,
+        sourceSentenceIndex: sentenceIndex,
+        sourceSentenceCount: steps.length,
+        isGoalScoringStep: isGoal ? isLastSentenceStep : undefined
+      };
+
+      timelineEvents.push(stepEvent);
+      timelineSnapshots.push({
+        ...baseSnapshot,
+        event: stepEvent,
+        sourceEventIndex,
+        sourceSnapshotIndex: eventIndex
+      });
+    });
+  });
+
+  return {
+    events: timelineEvents,
+    snapshots: timelineSnapshots
+  };
+}
+
+function getSnapshotSourceIndex(snapshot, fallbackIndex) {
+  if (!snapshot) {
+    return null;
+  }
+
+  if (snapshot.sourceEventIndex !== undefined) {
+    return snapshot.sourceEventIndex;
+  }
+
+  return getEventSourceIndex(snapshot.event, fallbackIndex);
+}
+
+function getEventStepLabel(event) {
+  const base = `${event.time ?? "-"} мин • шаг ${event.step ?? "-"}`;
+  if (!event || !event.sourceSentenceCount || event.sourceSentenceCount <= 1) {
+    return base;
+  }
+
+  return `${base} • фраза ${event.sourceSentenceIndex + 1}/${event.sourceSentenceCount}`;
+}
+
 function renderEventCard(snapshot) {
   if (!snapshot) {
     eventClock.textContent = "Минута -";
@@ -1153,7 +1268,7 @@ function renderEventCard(snapshot) {
   const event = snapshot.event;
   const teamSide = getTeamSide(event.team || "");
   const isGoal = isGoalEvent(event);
-  eventClock.textContent = `Минута ${event.time ?? "-"} • Итерация ${event.step ?? "-"}`;
+  eventClock.textContent = `Минута ${event.time ?? "-"} • Итерация ${event.step ?? "-"}${event.sourceSentenceCount > 1 ? ` • Фраза ${event.sourceSentenceIndex + 1}/${event.sourceSentenceCount}` : ""}`;
   eventAction.textContent = normalizeActionLabel(event.action);
   eventResult.textContent = getResultLabel(event.result);
   eventTeam.innerHTML = formatTeamName(event.team || "-");
@@ -1180,7 +1295,7 @@ function renderEventList() {
     button.type = "button";
     button.className = `event-item ${index === state.currentIndex ? "active" : ""}`;
     button.innerHTML = `
-      <small>${event.time ?? "-"} мин • шаг ${event.step ?? "-"}</small>
+      <small>${getEventStepLabel(event)}</small>
       <strong>${normalizeActionLabel(event.action)}</strong>
       <span>${sanitizeEventHtml(event.cue1 || event.team || "Без текста")}</span>
     `;
@@ -1367,6 +1482,7 @@ async function parseMatchPage() {
   state.playerById = {};
   state.playerPositionById = {};
   state.markerNodes = {};
+  state.actionLineKey = null;
   renderMarkers(null);
   renderEventCard(null);
   renderEventList();
@@ -1423,17 +1539,19 @@ async function parseMatchPage() {
     const events = rendered.events.filter((event) => event.action || event.cue1 || event.position);
 
     updateProgress("build", `Собираю визуализацию по ${events.length} событиям...`);
-    state.events = events;
     state.text = rendered.text;
     state.teams = extractTeamsFromMatchDoc(pageDoc || logDoc, events);
-    state.score = buildScore(events, state.teams);
     state.teamByPlayerId = inferTeamByPlayer(events, state.teams);
     state.playerById = buildPlayerInfoById(events);
     state.playerPositionById = buildPlayerPositionById(
       events,
       extractPositionByPlayerName(pageDoc || logDoc)
     );
-    state.snapshots = buildSnapshots(events, state.teams, state.teamByPlayerId, state.playerPositionById);
+    const baseSnapshots = buildSnapshots(events, state.teams, state.teamByPlayerId, state.playerPositionById);
+    const sentenceTimeline = buildEventSentenceTimeline(events, baseSnapshots);
+    state.events = sentenceTimeline.events;
+    state.snapshots = sentenceTimeline.snapshots;
+    state.score = buildScore(state.events, state.teams);
 
     fillSummary();
     enableTimeline();
@@ -1446,7 +1564,7 @@ async function parseMatchPage() {
       renderEventCard(null);
     }
 
-    completeProgress(`Готово. Загружено ${events.length} событий${finalLogUrl ? ` из ${finalLogUrl}.` : "."}`);
+    completeProgress(`Готово. Загружено ${events.length} событий, ${state.events.length} шагов${finalLogUrl ? ` из ${finalLogUrl}.` : "."}`);
     setStatus(statusText);
   } catch (error) {
     const errorMessage = String(error && error.message ? error.message : error);
