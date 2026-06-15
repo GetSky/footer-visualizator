@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { getMatchUrlFromQuery, normalizeMatchQueryValue } from "../src/app/query.js";
 import { clampCoord, coordToPercent, getCoordsPair, getCornerKickPasserPoint } from "../src/field/geometry.js";
-import { buildScore, buildScoreUntilIndex } from "../src/match/actions.js";
+import { buildScore, buildScoreUntilIndex, isGoalEvent } from "../src/match/actions.js";
 import { buildPlayerInfoById, buildPlayerPositionById } from "../src/match/players.js";
 import { buildSnapshots } from "../src/match/snapshots.js";
 import { inferTeamByPlayer } from "../src/match/teams.js";
@@ -95,6 +95,8 @@ test("scoring counts only successful shot actions by team", () => {
   assert.deepEqual(buildScore(events, teams), [1, 0]);
   assert.deepEqual(buildScoreUntilIndex(events, teams, 1), [0, 0]);
   assert.deepEqual(buildScoreUntilIndex(events, teams, 2), [1, 0]);
+  assert.equal(isGoalEvent(events[0]), false);
+  assert.equal(isGoalEvent(events[1]), true);
 });
 
 test("team and player maps are inferred from event participants", () => {
