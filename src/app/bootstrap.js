@@ -1,16 +1,4 @@
-function normalizeMatchQueryValue(value) {
-  const trimmedValue = value.trim();
-  if (/^\d+$/.test(trimmedValue)) {
-    return `https://footter.com/match/${trimmedValue}/`;
-  }
-  return trimmedValue;
-}
-
-function getMatchUrlFromQuery(search = window.location.search) {
-  const params = new URLSearchParams(search);
-  const queryValue = params.get("url") || params.get("match_url") || params.get("match");
-  return queryValue ? normalizeMatchQueryValue(queryValue) : "";
-}
+import { getMatchUrlFromQuery } from "./query.js";
 
 function isLocalResourceLaunch(location = window.location) {
   return location.protocol === "file:" || location.protocol === "res:";
@@ -145,7 +133,7 @@ export function initializeApp(options) {
 
   syncLocalSourceVisibility(elements);
 
-  const queryMatchUrl = getMatchUrlFromQuery();
+  const queryMatchUrl = getMatchUrlFromQuery(window.location.search);
   if (queryMatchUrl) {
     elements.urlInput.value = queryMatchUrl;
     parseMatchPage();

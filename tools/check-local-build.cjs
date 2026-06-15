@@ -30,6 +30,7 @@ const moduleAssets = [
   "src/match/players.js",
   "src/match/teams.js",
   "src/match/snapshots.js",
+  "src/app/query.js",
   "src/app/bootstrap.js",
 ];
 
@@ -60,12 +61,34 @@ if (localHtml.includes(remoteBaseUrl)) {
   throw new Error("Local HTML still contains production asset base URL");
 }
 
-const appJs = fs.readFileSync(path.join(rootDir, "src", "app.js"), "utf8");
+const importedAssets = new Set();
+
+function toPosixPath(value) {
+  return value.split(path.sep).join("/");
+}
+
+function resolveModuleImport(fromAsset, importPath) {
+  if (!importPath.startsWith(".")) {
+    return null;
+  }
+
+  return path.posix.normalize(path.posix.join(path.posix.dirname(fromAsset), importPath));
+}
+
+for (const asset of ["src/app.js", ...moduleAssets]) {
+  const source = fs.readFileSync(path.join(rootDir, asset), "utf8");
+  const importMatches = source.matchAll(/^\s*import\s+(?:[\s\S]*?\s+from\s+)?["']([^"']+)["'];?/gm);
+
+  for (const match of importMatches) {
+    const resolvedImport = resolveModuleImport(toPosixPath(asset), match[1]);
+    if (resolvedImport) {
+      importedAssets.add(resolvedImport);
+    }
+  }
+}
 
 for (const asset of moduleAssets) {
-  const importPath = asset.replace(/^src\//, "./");
-
-  if (!appJs.includes(importPath) && !appJs.includes(importPath.replace(/^\.\//, "../"))) {
+  if (!importedAssets.has(asset)) {
     throw new Error(`App module does not import asset: ${asset}`);
   }
 }
