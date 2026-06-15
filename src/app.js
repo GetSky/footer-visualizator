@@ -12,6 +12,7 @@ import {
   isDribbleAction,
   isFailedPassResult,
   isFoulAction,
+  isGoalEvent,
   isNavesShotEvent,
   isPassAction,
   isShotAction,
@@ -1151,6 +1152,7 @@ function renderEventCard(snapshot) {
 
   const event = snapshot.event;
   const teamSide = getTeamSide(event.team || "");
+  const isGoal = isGoalEvent(event);
   eventClock.textContent = `Минута ${event.time ?? "-"} • Итерация ${event.step ?? "-"}`;
   eventAction.textContent = normalizeActionLabel(event.action);
   eventResult.textContent = getResultLabel(event.result);
@@ -1165,6 +1167,10 @@ function renderEventCard(snapshot) {
   currentLogText.innerHTML = sanitizeEventHtml(
     stripLeadingCoordsPrefix(event.cue1 || event.raw_text || "Описание отсутствует.")
   );
+  if (isGoal) {
+    void currentLogCard.offsetWidth;
+    currentLogCard.classList.add("goal-event");
+  }
 }
 
 function renderEventList() {
@@ -1271,6 +1277,12 @@ function schedulePlayback() {
   }
   playButton.textContent = "Pause";
 
+  const getPlaybackDelay = () => {
+    const baseDelay = Number(speedSelect.value) || 0;
+    const currentEvent = state.events[state.currentIndex];
+    return baseDelay * (isGoalEvent(currentEvent) ? 2 : 1);
+  };
+
   const tick = () => {
     if (state.currentIndex >= state.snapshots.length - 1) {
       stopPlayback();
@@ -1278,10 +1290,10 @@ function schedulePlayback() {
     }
 
     setCurrentIndex(state.currentIndex + 1);
-    state.timer = setTimeout(tick, Number(speedSelect.value));
+    state.timer = setTimeout(tick, getPlaybackDelay());
   };
 
-  state.timer = setTimeout(tick, Number(speedSelect.value));
+  state.timer = setTimeout(tick, getPlaybackDelay());
 }
 
 function fillSummary() {

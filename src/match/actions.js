@@ -119,15 +119,8 @@ export function buildScore(events, teams) {
   const away = normalizeText(teams[1]);
 
   events.forEach((event) => {
-    const action = String(event.action || "").toLowerCase();
     const team = normalizeText(event.team);
-    const isGoal = isShotAction(action) && (
-      event.result === 1
-      || event.result === true
-      || event.result === "1"
-    );
-
-    if (!isGoal) {
+    if (!isGoalEvent(event)) {
       return;
     }
 
@@ -139,6 +132,15 @@ export function buildScore(events, teams) {
   });
 
   return score;
+}
+
+export function isGoalEvent(event) {
+  const action = String((event && event.action) || "").toLowerCase();
+  return isShotAction(action) && (
+    event.result === 1
+    || event.result === true
+    || event.result === "1"
+  );
 }
 
 export function buildScoreUntilIndex(events, teams, endExclusive) {
