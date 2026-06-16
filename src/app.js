@@ -734,6 +734,19 @@ function isFinalSentenceStep(event) {
     || event.sourceSentenceIndex >= event.sourceSentenceCount - 1;
 }
 
+function isScoredShotEvent(event) {
+  const action = String((event && event.action) || "").toLowerCase();
+  return isShotAction(action) && (
+    event.result === 1
+    || event.result === true
+    || event.result === "1"
+  );
+}
+
+function isPendingGoalSentence(event) {
+  return isScoredShotEvent(event) && !isFinalSentenceStep(event);
+}
+
 function getActionLineTone(event) {
   return isFinalSentenceStep(event) ? "final" : "pending";
 }
@@ -1041,8 +1054,13 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     entries.push(shotGoalkeeper);
   }
 
+  const shouldHideNextKickoffPlayer = currentSnapshot
+    && nextSnapshot
+    && isPendingGoalSentence(currentSnapshot.event)
+    && getSnapshotAction(nextSnapshot) === "розыгрыш";
   const shouldRenderNextSnapshotPlayers = nextSnapshot
     && !isFoulFrame
+    && !shouldHideNextKickoffPlayer
     && currentAction !== "розыгрыш"
     && !isPassFollowedByFoul(currentSnapshot, nextSnapshot)
     && !isCornerKickNavesShotEvent(nextSnapshot.event);
