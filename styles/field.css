@@ -222,9 +222,12 @@
   background: linear-gradient(90deg, rgba(208, 64, 64, 0.95), rgba(208, 64, 64, 0.3));
 }
 
+.pass-line.pending {
+  background: linear-gradient(90deg, rgba(139, 148, 158, 0.95), rgba(139, 148, 158, 0.3));
+}
+
 .pass-line.mixed-pass {
   height: 4px;
-  background: linear-gradient(90deg, rgba(246, 190, 64, 0.96), rgba(246, 190, 64, 0.28));
   z-index: 9;
 }
 
@@ -292,6 +295,11 @@
 .player-marker.next-step {
   --marker-opacity: 0.48;
   filter: saturate(0.78);
+}
+
+.player-marker.pending-outcome {
+  --marker-opacity: 0.5;
+  filter: saturate(0.72);
 }
 
 .player-tag {

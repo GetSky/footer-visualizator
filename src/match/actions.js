@@ -117,12 +117,19 @@ export function buildScore(events, teams) {
   const score = [0, 0];
   const home = normalizeText(teams[0]);
   const away = normalizeText(teams[1]);
+  const countedGoalKeys = new Set();
 
-  events.forEach((event) => {
+  events.forEach((event, index) => {
     const team = normalizeText(event.team);
     if (!isGoalEvent(event)) {
       return;
     }
+
+    const goalKey = event.sourceEventIndex ?? event.index ?? index;
+    if (countedGoalKeys.has(goalKey)) {
+      return;
+    }
+    countedGoalKeys.add(goalKey);
 
     if (team === home) {
       score[0] += 1;
@@ -135,6 +142,10 @@ export function buildScore(events, teams) {
 }
 
 export function isGoalEvent(event) {
+  if (event && event.isGoalScoringStep === false) {
+    return false;
+  }
+
   const action = String((event && event.action) || "").toLowerCase();
   return isShotAction(action) && (
     event.result === 1

@@ -99,7 +99,8 @@ const state = {
   snapshots: [],
   currentIndex: 0,
   timer: null,
-  markerNodes: {}
+  markerNodes: {},
+  actionLineKey: null
 };
 
 const {
@@ -619,8 +620,13 @@ function getPassTargetMarker(currentSnapshot, nextSnapshot) {
 }
 
 function getNextRenderableSnapshot(startIndex) {
+  const currentSourceIndex = getSnapshotSourceIndex(state.snapshots[startIndex], startIndex);
   for (let index = startIndex + 1; index < state.snapshots.length; index++) {
     const snapshot = state.snapshots[index];
+    if (getSnapshotSourceIndex(snapshot, index) === currentSourceIndex) {
+      continue;
+    }
+
     const action = String((snapshot && snapshot.event && snapshot.event.action) || "").toLowerCase();
     if (!isSubstitutionAction(action)) {
       return snapshot;
@@ -630,8 +636,13 @@ function getNextRenderableSnapshot(startIndex) {
 }
 
 function getPreviousRenderableSnapshot(startIndex) {
+  const currentSourceIndex = getSnapshotSourceIndex(state.snapshots[startIndex], startIndex);
   for (let index = startIndex - 1; index >= 0; index--) {
     const snapshot = state.snapshots[index];
+    if (getSnapshotSourceIndex(snapshot, index) === currentSourceIndex) {
+      continue;
+    }
+
     const action = String((snapshot && snapshot.event && snapshot.event.action) || "").toLowerCase();
     if (!isSubstitutionAction(action)) {
       return snapshot;
@@ -716,7 +727,31 @@ function getFoulContestMarkers(currentSnapshot, previousSnapshot, nextSnapshot, 
   return markers;
 }
 
-function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "") {
+function isFinalSentenceStep(event) {
+  return !event
+    || !event.sourceSentenceCount
+    || event.sourceSentenceCount <= 1
+    || event.sourceSentenceIndex >= event.sourceSentenceCount - 1;
+}
+
+function isScoredShotEvent(event) {
+  const action = String((event && event.action) || "").toLowerCase();
+  return isShotAction(action) && (
+    event.result === 1
+    || event.result === true
+    || event.result === "1"
+  );
+}
+
+function isPendingGoalSentence(event) {
+  return isScoredShotEvent(event) && !isFinalSentenceStep(event);
+}
+
+function getActionLineTone(event) {
+  return isFinalSentenceStep(event) ? "final" : "pending";
+}
+
+function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "", isPending = false) {
   if (!fromPoint) {
     return;
   }
@@ -734,7 +769,7 @@ function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "")
 
   const angle = Math.atan2(dy, dx) * 180 / Math.PI;
   const line = document.createElement("div");
-  line.className = `pass-line ${isFailed ? "fail" : "success"} ${extraClass}`.trim();
+  line.className = `pass-line ${isPending ? "pending" : (isFailed ? "fail" : "success")} ${extraClass}`.trim();
   line.style.left = `${fromX}px`;
   line.style.top = `${fromY}px`;
   line.style.width = `${length}px`;
@@ -742,7 +777,7 @@ function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "")
   trailLayer.appendChild(line);
 }
 
-function appendActionLine(fromPoint, toPoint, isFailed, extraClass = "") {
+function appendActionLine(fromPoint, toPoint, isFailed, extraClass = "", isPending = false) {
   if (!toPoint) {
     return;
   }
@@ -754,11 +789,32 @@ function appendActionLine(fromPoint, toPoint, isFailed, extraClass = "") {
     (to.x / 100) * fieldRect.width,
     (to.y / 100) * fieldRect.height,
     isFailed,
-    extraClass
+    extraClass,
+    isPending
   );
 }
 
+function getActionLineRenderKey(currentSnapshot, nextSnapshot) {
+  if (!currentSnapshot) {
+    return "";
+  }
+
+  const fieldRect = field.getBoundingClientRect();
+  return [
+    getSnapshotSourceIndex(currentSnapshot, state.currentIndex),
+    getSnapshotSourceIndex(nextSnapshot, -1),
+    getActionLineTone(currentSnapshot.event),
+    Math.round(fieldRect.width),
+    Math.round(fieldRect.height)
+  ].join(":");
+}
+
 function renderActionLine(currentSnapshot, nextSnapshot) {
+  const actionLineKey = getActionLineRenderKey(currentSnapshot, nextSnapshot);
+  if (state.actionLineKey === actionLineKey) {
+    return;
+  }
+  state.actionLineKey = actionLineKey;
   trailLayer.innerHTML = "";
   if (!currentSnapshot) {
     return;
@@ -773,10 +829,11 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
   if (!fromPoint) {
     return;
   }
+  const isPendingLine = !isFinalSentenceStep(currentSnapshot.event);
 
   const cornerPassInfo = getCornerKickPassInfo(currentSnapshot);
   if (cornerPassInfo) {
-    appendActionLine(cornerPassInfo.fromPoint, cornerPassInfo.toPoint, false, "mixed-pass");
+    appendActionLine(cornerPassInfo.fromPoint, cornerPassInfo.toPoint, false, "mixed-pass", isPendingLine);
   }
 
   if (isCornerKickNavesEvent(currentSnapshot.event)) {
@@ -784,7 +841,7 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
       ? nextSnapshot.focusPoint
       : getCoordsPair(currentSnapshot.event).from;
     if (targetPoint) {
-      appendActionLine(currentSnapshot.focusPoint, targetPoint, isFailedPassResult(currentSnapshot.event.result), "mixed-pass");
+      appendActionLine(currentSnapshot.focusPoint, targetPoint, isFailedPassResult(currentSnapshot.event.result), "mixed-pass", isPendingLine);
       return;
     }
   }
@@ -796,13 +853,13 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
     nextSnapshot
   );
   if (regularCornerPassInfo) {
-    appendActionLine(regularCornerPassInfo.fromPoint, regularCornerPassInfo.toPoint, false, "mixed-pass");
+    appendActionLine(regularCornerPassInfo.fromPoint, regularCornerPassInfo.toPoint, false, "mixed-pass", isPendingLine);
     return;
   }
 
   const mixedNavesShotPassInfo = getMixedNavesShotPassInfo(currentSnapshot);
   if (mixedNavesShotPassInfo) {
-    appendActionLine(mixedNavesShotPassInfo.fromPoint, mixedNavesShotPassInfo.toPoint, false, "mixed-pass");
+    appendActionLine(mixedNavesShotPassInfo.fromPoint, mixedNavesShotPassInfo.toPoint, false, "mixed-pass", isPendingLine);
   }
 
   let toPoint = null;
@@ -824,7 +881,7 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
       || currentSnapshot.event.result === true
       || currentSnapshot.event.result === "1"
     );
-    appendActionLineToPixel(fromPoint, goalX, goalY, isFailed);
+    appendActionLineToPixel(fromPoint, goalX, goalY, isFailed, "", isPendingLine);
     return;
   }
 
@@ -836,7 +893,7 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
       || currentSnapshot.event.result === "1"
     );
 
-  appendActionLine(fromPoint, toPoint, isFailed);
+  appendActionLine(fromPoint, toPoint, isFailed, "", isPendingLine);
 }
 
 function getPlayerCellDedupeKey(player) {
@@ -893,6 +950,29 @@ function dedupeSamePlayerCellMarkers(entries) {
   });
 
   return deduped;
+}
+
+function isOutcomeMarker(player) {
+  return Boolean(player && (
+    player.isIncomingOpponent
+    || player.isPassTarget
+    || player.isFoulContest
+    || player.role === "incoming-opponent"
+  ));
+}
+
+function applyPendingOutcomeMarker(player) {
+  if (!isOutcomeMarker(player)) {
+    return player;
+  }
+
+  return {
+    ...player,
+    hasDangerArrow: false,
+    isIncomingOpponent: false,
+    isFailedTarget: false,
+    isPendingOutcomeMarker: true
+  };
 }
 
 function renderMarkers(currentSnapshot, nextSnapshot) {
@@ -974,8 +1054,13 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     entries.push(shotGoalkeeper);
   }
 
+  const shouldHideNextKickoffPlayer = currentSnapshot
+    && nextSnapshot
+    && isPendingGoalSentence(currentSnapshot.event)
+    && getSnapshotAction(nextSnapshot) === "розыгрыш";
   const shouldRenderNextSnapshotPlayers = nextSnapshot
     && !isFoulFrame
+    && !shouldHideNextKickoffPlayer
     && currentAction !== "розыгрыш"
     && !isPassFollowedByFoul(currentSnapshot, nextSnapshot)
     && !isCornerKickNavesShotEvent(nextSnapshot.event);
@@ -1017,7 +1102,11 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     }
   }
 
-  const visibleEntries = dedupeSamePlayerCellMarkers(entries);
+  const shouldDeferOutcomeMarkers = currentSnapshot && !isFinalSentenceStep(currentSnapshot.event);
+  const preparedEntries = shouldDeferOutcomeMarkers
+    ? entries.map(applyPendingOutcomeMarker)
+    : entries;
+  const visibleEntries = dedupeSamePlayerCellMarkers(preparedEntries);
   const nextIds = new Set(visibleEntries.map((player) => player.markerId));
 
   visibleEntries.forEach((player) => {
@@ -1080,7 +1169,7 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     const verticalOffset = player.isCornerPasser
       ? 0
       : (stackIndex - ((stack.length - 1) / 2)) * 50;
-    marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""} ${player.isMixedPasser ? "mixed-passer" : ""} ${player.isGoalkeeper ? "goalkeeper" : ""}`;
+    marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""} ${player.isMixedPasser ? "mixed-passer" : ""} ${player.isGoalkeeper ? "goalkeeper" : ""} ${player.isPendingOutcomeMarker ? "pending-outcome" : ""}`;
     marker.style.left = `${pos.x}%`;
     marker.style.top = `calc(${pos.y}% + ${verticalOffset}px)`;
     marker.style.zIndex = (player.isIncomingOpponent || player.isPassTarget)
@@ -1135,6 +1224,91 @@ function stripLeadingCoordsPrefix(rawHtml) {
   return String(rawHtml || "").replace(/^\s*\[[^\[\]]+\]\s*/, "");
 }
 
+function htmlToPlainText(rawHtml) {
+  const doc = new DOMParser().parseFromString(`<div>${rawHtml || ""}</div>`, "text/html");
+  return normalizeText((doc.body.firstElementChild && doc.body.firstElementChild.textContent) || rawHtml || "");
+}
+
+function splitDescriptionSentences(rawHtml) {
+  const text = htmlToPlainText(stripLeadingCoordsPrefix(rawHtml));
+  if (!text) {
+    return [];
+  }
+
+  const matches = text.match(/[^.!?…]+(?:[.!?…]+(?=\s|$)|$)/g) || [];
+  const sentences = matches.map((sentence) => normalizeText(sentence)).filter(Boolean);
+  return sentences.length ? sentences : [text];
+}
+
+function getEventDescriptionText(event) {
+  return event.cue1 || event.raw_text || event.team || "";
+}
+
+function getEventSourceIndex(event, fallbackIndex) {
+  return event && event.sourceEventIndex !== undefined
+    ? event.sourceEventIndex
+    : (event && event.index !== undefined ? event.index : fallbackIndex);
+}
+
+function buildEventSentenceTimeline(events, baseSnapshots) {
+  const timelineEvents = [];
+  const timelineSnapshots = [];
+
+  events.forEach((event, eventIndex) => {
+    const baseSnapshot = baseSnapshots[eventIndex];
+    const sentences = splitDescriptionSentences(getEventDescriptionText(event));
+    const steps = sentences.length ? sentences : [stripLeadingCoordsPrefix(getEventDescriptionText(event)) || "Описание отсутствует."];
+    const sourceEventIndex = getEventSourceIndex(event, eventIndex);
+    const isGoal = isGoalEvent(event);
+
+    steps.forEach((sentence, sentenceIndex) => {
+      const isLastSentenceStep = sentenceIndex === steps.length - 1;
+      const stepEvent = {
+        ...event,
+        cue1: sentence,
+        sourceEventIndex,
+        sourceSentenceIndex: sentenceIndex,
+        sourceSentenceCount: steps.length,
+        isGoalScoringStep: isGoal ? isLastSentenceStep : undefined
+      };
+
+      timelineEvents.push(stepEvent);
+      timelineSnapshots.push({
+        ...baseSnapshot,
+        event: stepEvent,
+        sourceEventIndex,
+        sourceSnapshotIndex: eventIndex
+      });
+    });
+  });
+
+  return {
+    events: timelineEvents,
+    snapshots: timelineSnapshots
+  };
+}
+
+function getSnapshotSourceIndex(snapshot, fallbackIndex) {
+  if (!snapshot) {
+    return null;
+  }
+
+  if (snapshot.sourceEventIndex !== undefined) {
+    return snapshot.sourceEventIndex;
+  }
+
+  return getEventSourceIndex(snapshot.event, fallbackIndex);
+}
+
+function getEventStepLabel(event) {
+  const base = `${event.time ?? "-"} мин • шаг ${event.step ?? "-"}`;
+  if (!event || !event.sourceSentenceCount || event.sourceSentenceCount <= 1) {
+    return base;
+  }
+
+  return `${base} • фраза ${event.sourceSentenceIndex + 1}/${event.sourceSentenceCount}`;
+}
+
 function renderEventCard(snapshot) {
   if (!snapshot) {
     eventClock.textContent = "Минута -";
@@ -1153,7 +1327,7 @@ function renderEventCard(snapshot) {
   const event = snapshot.event;
   const teamSide = getTeamSide(event.team || "");
   const isGoal = isGoalEvent(event);
-  eventClock.textContent = `Минута ${event.time ?? "-"} • Итерация ${event.step ?? "-"}`;
+  eventClock.textContent = `Минута ${event.time ?? "-"} • Итерация ${event.step ?? "-"}${event.sourceSentenceCount > 1 ? ` • Фраза ${event.sourceSentenceIndex + 1}/${event.sourceSentenceCount}` : ""}`;
   eventAction.textContent = normalizeActionLabel(event.action);
   eventResult.textContent = getResultLabel(event.result);
   eventTeam.innerHTML = formatTeamName(event.team || "-");
@@ -1180,7 +1354,7 @@ function renderEventList() {
     button.type = "button";
     button.className = `event-item ${index === state.currentIndex ? "active" : ""}`;
     button.innerHTML = `
-      <small>${event.time ?? "-"} мин • шаг ${event.step ?? "-"}</small>
+      <small>${getEventStepLabel(event)}</small>
       <strong>${normalizeActionLabel(event.action)}</strong>
       <span>${sanitizeEventHtml(event.cue1 || event.team || "Без текста")}</span>
     `;
@@ -1367,6 +1541,7 @@ async function parseMatchPage() {
   state.playerById = {};
   state.playerPositionById = {};
   state.markerNodes = {};
+  state.actionLineKey = null;
   renderMarkers(null);
   renderEventCard(null);
   renderEventList();
@@ -1423,17 +1598,19 @@ async function parseMatchPage() {
     const events = rendered.events.filter((event) => event.action || event.cue1 || event.position);
 
     updateProgress("build", `Собираю визуализацию по ${events.length} событиям...`);
-    state.events = events;
     state.text = rendered.text;
     state.teams = extractTeamsFromMatchDoc(pageDoc || logDoc, events);
-    state.score = buildScore(events, state.teams);
     state.teamByPlayerId = inferTeamByPlayer(events, state.teams);
     state.playerById = buildPlayerInfoById(events);
     state.playerPositionById = buildPlayerPositionById(
       events,
       extractPositionByPlayerName(pageDoc || logDoc)
     );
-    state.snapshots = buildSnapshots(events, state.teams, state.teamByPlayerId, state.playerPositionById);
+    const baseSnapshots = buildSnapshots(events, state.teams, state.teamByPlayerId, state.playerPositionById);
+    const sentenceTimeline = buildEventSentenceTimeline(events, baseSnapshots);
+    state.events = sentenceTimeline.events;
+    state.snapshots = sentenceTimeline.snapshots;
+    state.score = buildScore(state.events, state.teams);
 
     fillSummary();
     enableTimeline();
@@ -1446,7 +1623,7 @@ async function parseMatchPage() {
       renderEventCard(null);
     }
 
-    completeProgress(`Готово. Загружено ${events.length} событий${finalLogUrl ? ` из ${finalLogUrl}.` : "."}`);
+    completeProgress(`Готово. Загружено ${events.length} событий, ${state.events.length} шагов${finalLogUrl ? ` из ${finalLogUrl}.` : "."}`);
     setStatus(statusText);
   } catch (error) {
     const errorMessage = String(error && error.message ? error.message : error);

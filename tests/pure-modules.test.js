@@ -99,6 +99,33 @@ test("scoring counts only successful shot actions by team", () => {
   assert.equal(isGoalEvent(events[1]), true);
 });
 
+test("scoring delays expanded goal events until the final sentence step", () => {
+  const goalSteps = [
+    {
+      index: 1,
+      sourceEventIndex: 1,
+      team: "Home",
+      action: "medium_shot",
+      result: 1,
+      isGoalScoringStep: false
+    },
+    {
+      index: 1,
+      sourceEventIndex: 1,
+      team: "Home",
+      action: "medium_shot",
+      result: 1,
+      isGoalScoringStep: true
+    }
+  ];
+
+  assert.equal(isGoalEvent(goalSteps[0]), false);
+  assert.equal(isGoalEvent(goalSteps[1]), true);
+  assert.deepEqual(buildScoreUntilIndex(goalSteps, teams, 1), [0, 0]);
+  assert.deepEqual(buildScoreUntilIndex(goalSteps, teams, 2), [1, 0]);
+  assert.deepEqual(buildScore([...goalSteps, goalSteps[1]], teams), [1, 0]);
+});
+
 test("team and player maps are inferred from event participants", () => {
   const events = makeEvents();
   const teamByPlayer = inferTeamByPlayer(events, teams);
