@@ -727,7 +727,18 @@ function getFoulContestMarkers(currentSnapshot, previousSnapshot, nextSnapshot, 
   return markers;
 }
 
-function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "") {
+function isFinalSentenceStep(event) {
+  return !event
+    || !event.sourceSentenceCount
+    || event.sourceSentenceCount <= 1
+    || event.sourceSentenceIndex >= event.sourceSentenceCount - 1;
+}
+
+function getActionLineTone(event) {
+  return isFinalSentenceStep(event) ? "final" : "pending";
+}
+
+function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "", isPending = false) {
   if (!fromPoint) {
     return;
   }
@@ -745,7 +756,7 @@ function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "")
 
   const angle = Math.atan2(dy, dx) * 180 / Math.PI;
   const line = document.createElement("div");
-  line.className = `pass-line ${isFailed ? "fail" : "success"} ${extraClass}`.trim();
+  line.className = `pass-line ${isPending ? "pending" : (isFailed ? "fail" : "success")} ${extraClass}`.trim();
   line.style.left = `${fromX}px`;
   line.style.top = `${fromY}px`;
   line.style.width = `${length}px`;
@@ -753,7 +764,7 @@ function appendActionLineToPixel(fromPoint, toX, toY, isFailed, extraClass = "")
   trailLayer.appendChild(line);
 }
 
-function appendActionLine(fromPoint, toPoint, isFailed, extraClass = "") {
+function appendActionLine(fromPoint, toPoint, isFailed, extraClass = "", isPending = false) {
   if (!toPoint) {
     return;
   }
@@ -765,7 +776,8 @@ function appendActionLine(fromPoint, toPoint, isFailed, extraClass = "") {
     (to.x / 100) * fieldRect.width,
     (to.y / 100) * fieldRect.height,
     isFailed,
-    extraClass
+    extraClass,
+    isPending
   );
 }
 
@@ -778,6 +790,7 @@ function getActionLineRenderKey(currentSnapshot, nextSnapshot) {
   return [
     getSnapshotSourceIndex(currentSnapshot, state.currentIndex),
     getSnapshotSourceIndex(nextSnapshot, -1),
+    getActionLineTone(currentSnapshot.event),
     Math.round(fieldRect.width),
     Math.round(fieldRect.height)
   ].join(":");
@@ -803,10 +816,11 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
   if (!fromPoint) {
     return;
   }
+  const isPendingLine = !isFinalSentenceStep(currentSnapshot.event);
 
   const cornerPassInfo = getCornerKickPassInfo(currentSnapshot);
   if (cornerPassInfo) {
-    appendActionLine(cornerPassInfo.fromPoint, cornerPassInfo.toPoint, false, "mixed-pass");
+    appendActionLine(cornerPassInfo.fromPoint, cornerPassInfo.toPoint, false, "mixed-pass", isPendingLine);
   }
 
   if (isCornerKickNavesEvent(currentSnapshot.event)) {
@@ -814,7 +828,7 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
       ? nextSnapshot.focusPoint
       : getCoordsPair(currentSnapshot.event).from;
     if (targetPoint) {
-      appendActionLine(currentSnapshot.focusPoint, targetPoint, isFailedPassResult(currentSnapshot.event.result), "mixed-pass");
+      appendActionLine(currentSnapshot.focusPoint, targetPoint, isFailedPassResult(currentSnapshot.event.result), "mixed-pass", isPendingLine);
       return;
     }
   }
@@ -826,13 +840,13 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
     nextSnapshot
   );
   if (regularCornerPassInfo) {
-    appendActionLine(regularCornerPassInfo.fromPoint, regularCornerPassInfo.toPoint, false, "mixed-pass");
+    appendActionLine(regularCornerPassInfo.fromPoint, regularCornerPassInfo.toPoint, false, "mixed-pass", isPendingLine);
     return;
   }
 
   const mixedNavesShotPassInfo = getMixedNavesShotPassInfo(currentSnapshot);
   if (mixedNavesShotPassInfo) {
-    appendActionLine(mixedNavesShotPassInfo.fromPoint, mixedNavesShotPassInfo.toPoint, false, "mixed-pass");
+    appendActionLine(mixedNavesShotPassInfo.fromPoint, mixedNavesShotPassInfo.toPoint, false, "mixed-pass", isPendingLine);
   }
 
   let toPoint = null;
@@ -854,7 +868,7 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
       || currentSnapshot.event.result === true
       || currentSnapshot.event.result === "1"
     );
-    appendActionLineToPixel(fromPoint, goalX, goalY, isFailed);
+    appendActionLineToPixel(fromPoint, goalX, goalY, isFailed, "", isPendingLine);
     return;
   }
 
@@ -866,7 +880,7 @@ function renderActionLine(currentSnapshot, nextSnapshot) {
       || currentSnapshot.event.result === "1"
     );
 
-  appendActionLine(fromPoint, toPoint, isFailed);
+  appendActionLine(fromPoint, toPoint, isFailed, "", isPendingLine);
 }
 
 function getPlayerCellDedupeKey(player) {
@@ -923,6 +937,29 @@ function dedupeSamePlayerCellMarkers(entries) {
   });
 
   return deduped;
+}
+
+function isOutcomeMarker(player) {
+  return Boolean(player && (
+    player.isIncomingOpponent
+    || player.isPassTarget
+    || player.isFoulContest
+    || player.role === "incoming-opponent"
+  ));
+}
+
+function applyPendingOutcomeMarker(player) {
+  if (!isOutcomeMarker(player)) {
+    return player;
+  }
+
+  return {
+    ...player,
+    hasDangerArrow: false,
+    isIncomingOpponent: false,
+    isFailedTarget: false,
+    isPendingOutcomeMarker: true
+  };
 }
 
 function renderMarkers(currentSnapshot, nextSnapshot) {
@@ -1047,7 +1084,11 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     }
   }
 
-  const visibleEntries = dedupeSamePlayerCellMarkers(entries);
+  const shouldDeferOutcomeMarkers = currentSnapshot && !isFinalSentenceStep(currentSnapshot.event);
+  const preparedEntries = shouldDeferOutcomeMarkers
+    ? entries.map(applyPendingOutcomeMarker)
+    : entries;
+  const visibleEntries = dedupeSamePlayerCellMarkers(preparedEntries);
   const nextIds = new Set(visibleEntries.map((player) => player.markerId));
 
   visibleEntries.forEach((player) => {
@@ -1110,7 +1151,7 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     const verticalOffset = player.isCornerPasser
       ? 0
       : (stackIndex - ((stack.length - 1) / 2)) * 50;
-    marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""} ${player.isMixedPasser ? "mixed-passer" : ""} ${player.isGoalkeeper ? "goalkeeper" : ""}`;
+    marker.className = `player-marker ${side} ${player.role === "ball" ? "active" : "dim"} ${player.markerPhase === "next" ? "next-step" : ""} ${player.isIncomingOpponent ? "incoming-opponent" : ""} ${player.isPassTarget ? "pass-target" : ""} ${player.isFailedTarget ? "failed-target" : ""} ${player.isCornerPasser ? "corner-passer" : ""} ${player.isMixedPasser ? "mixed-passer" : ""} ${player.isGoalkeeper ? "goalkeeper" : ""} ${player.isPendingOutcomeMarker ? "pending-outcome" : ""}`;
     marker.style.left = `${pos.x}%`;
     marker.style.top = `calc(${pos.y}% + ${verticalOffset}px)`;
     marker.style.zIndex = (player.isIncomingOpponent || player.isPassTarget)
