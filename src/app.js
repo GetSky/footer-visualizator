@@ -317,7 +317,7 @@ function resolvePlayerById(playerId, snapshot) {
 }
 
 function getCornerKickPassInfo(snapshot, sourcePoint = null) {
-  if (!snapshot || !isCornerKickNavesShotEvent(snapshot.event)) {
+  if (!snapshot || snapshot.event.prevPassMaterialized || !isCornerKickNavesShotEvent(snapshot.event)) {
     return null;
   }
 
@@ -443,7 +443,7 @@ function getRegularCornerTargetMarker(snapshot, sourcePoint = null, nextSnapshot
 }
 
 function getMixedNavesShotPassInfo(snapshot) {
-  if (!snapshot || !isNavesShotEvent(snapshot.event)) {
+  if (!snapshot || snapshot.event.prevPassMaterialized || !isNavesShotEvent(snapshot.event)) {
     return null;
   }
 
@@ -488,6 +488,43 @@ function getMixedNavesShotPasserMarker(snapshot) {
   };
 }
 
+function getPrevPassStepTargetMarker(currentSnapshot, nextSnapshot) {
+  if (!currentSnapshot || !currentSnapshot.event || !currentSnapshot.event.isPrevPassStep) {
+    return null;
+  }
+
+  const target = parsePlayerValue(currentSnapshot.event.target);
+  const targetPoint = getCoordsPair(currentSnapshot.event).to;
+  if (!target || !targetPoint) {
+    return null;
+  }
+
+  const nextActor = nextSnapshot ? parsePlayerValue(nextSnapshot.event.player_with_ball) : null;
+  if (nextActor && !samePlayer(target, nextActor)) {
+    return null;
+  }
+
+  const team = normalizeText(currentSnapshot.event.team);
+  const targetTeam = target.id && state.teamByPlayerId[target.id]
+    ? state.teamByPlayerId[target.id]
+    : team;
+
+  return {
+    ...makePlayerState(
+      target,
+      targetTeam,
+      targetPoint[0],
+      targetPoint[1],
+      "pass-target",
+      currentSnapshot.event.index,
+      targetTeam
+    ),
+    markerId: `prev-pass-target:${currentSnapshot.event.index}:${target.id || target.name}`,
+    markerPhase: "overlay",
+    isPassTarget: true
+  };
+}
+
 function isPassFollowedByFoul(currentSnapshot, nextSnapshot) {
   if (!currentSnapshot || !nextSnapshot) {
     return false;
@@ -511,6 +548,10 @@ function getPassRenderTargetSnapshot(currentSnapshot, nextSnapshot) {
 }
 
 function getPassRenderTargetPoint(currentSnapshot, nextSnapshot) {
+  if (currentSnapshot && currentSnapshot.event && currentSnapshot.event.isPrevPassStep) {
+    return getCoordsPair(currentSnapshot.event).to;
+  }
+
   const targetSnapshot = getPassRenderTargetSnapshot(currentSnapshot, nextSnapshot);
   if (isPassFollowedByFoul(currentSnapshot, nextSnapshot) && targetSnapshot) {
     const rawTargetPoint = getEventPoint(targetSnapshot.event);
@@ -1061,6 +1102,7 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
   const shouldRenderNextSnapshotPlayers = nextSnapshot
     && !isFoulFrame
     && !shouldHideNextKickoffPlayer
+    && !(currentSnapshot && currentSnapshot.event && currentSnapshot.event.isPrevPassStep)
     && currentAction !== "розыгрыш"
     && !isPassFollowedByFoul(currentSnapshot, nextSnapshot)
     && !isCornerKickNavesShotEvent(nextSnapshot.event);
@@ -1099,6 +1141,11 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     const passTarget = getPassTargetMarker(currentSnapshot, nextSnapshot);
     if (passTarget) {
       entries.push(passTarget);
+    }
+
+    const prevPassTarget = getPrevPassStepTargetMarker(currentSnapshot, nextSnapshot);
+    if (prevPassTarget) {
+      entries.push(prevPassTarget);
     }
   }
 
@@ -1250,6 +1297,116 @@ function getEventSourceIndex(event, fallbackIndex) {
     : (event && event.index !== undefined ? event.index : fallbackIndex);
 }
 
+function sameCoordPair(leftCoords, rightCoords) {
+  if (!Array.isArray(leftCoords) || !Array.isArray(rightCoords) || leftCoords.length < 2 || rightCoords.length < 2) {
+    return false;
+  }
+
+  return leftCoords[0][0] === rightCoords[0][0]
+    && leftCoords[0][1] === rightCoords[0][1]
+    && leftCoords[1][0] === rightCoords[1][0]
+    && leftCoords[1][1] === rightCoords[1][1];
+}
+
+function isPrevPassDuplicateOfEvent(prevPass, event) {
+  if (!prevPass || !event) {
+    return false;
+  }
+
+  const prevAction = String(prevPass.action || "").toLowerCase();
+  const eventAction = String(event.action || "").toLowerCase();
+  const sameAction = prevAction && eventAction && prevAction === eventAction;
+  const sameTime = prevPass.time === "" || event.time === undefined || prevPass.time === event.time;
+  const sameStep = prevPass.step === "" || event.step === undefined || prevPass.step === event.step;
+  const sameCoords = sameCoordPair(prevPass.coords, event.position);
+  return Boolean(sameAction && sameTime && sameStep && sameCoords);
+}
+
+function getPlayerLabelById(playerId, playerById) {
+  const id = parsePlayerIdReference(playerId);
+  if (!id) {
+    return "";
+  }
+
+  const player = playerById[id];
+  if (player && player.label) {
+    return player.label;
+  }
+
+  return `${id} ID ${id}`;
+}
+
+function getPrevPassTeam(prevPass, event, teams) {
+  if (prevPass.team) {
+    return prevPass.team;
+  }
+
+  if (prevPass.teamIndex !== "" && teams[prevPass.teamIndex]) {
+    return teams[prevPass.teamIndex];
+  }
+
+  return event.team || "";
+}
+
+function buildPrevPassTimelineEvent(event, prevPass, cue1, playerById, teams, suffix) {
+  const targetFromPrevPass = prevPass.target || getPlayerLabelById(prevPass.pr, playerById);
+  const target = targetFromPrevPass || event.player_with_ball || "";
+  const opponent = prevPass.opponent || getPlayerLabelById(prevPass.pe, playerById) || "";
+  const playerWithBall = prevPass.player_with_ball
+    || getPlayerLabelById(prevPass.pm || event.prev_pm, playerById)
+    || "";
+  const eventStartPoint = getEventPoint(event);
+  const prevPassPosition = prevPass.coords.length >= 2 && eventStartPoint
+    ? [prevPass.coords[0], eventStartPoint]
+    : prevPass.coords;
+
+  return {
+    index: `${event.index}:prev_pass:${suffix}`,
+    sourceEventIndex: `${getEventSourceIndex(event, suffix)}:prev_pass`,
+    isPrevPassStep: true,
+    action: prevPass.action || "pass",
+    time: prevPass.time !== "" ? prevPass.time : event.time,
+    step: prevPass.step !== "" ? prevPass.step : event.step,
+    team: getPrevPassTeam(prevPass, event, teams),
+    position: prevPassPosition,
+    result: prevPass.result !== "" ? prevPass.result : event.result,
+    player_with_ball: playerWithBall,
+    target,
+    opponent,
+    cue1: cue1 || prevPass.cue1 || event.prev_pass || "",
+    raw_text: prevPass.cue1 || event.prev_pass || "",
+    prevPassForEventIndex: getEventSourceIndex(event, suffix)
+  };
+}
+
+function expandEventsWithPrevPassSteps(events, teams, playerById) {
+  const expanded = [];
+
+  events.forEach((event, eventIndex) => {
+    const prevPass = parsePrevPassValue(event.prev_pass);
+    const hasPrevPassStep = prevPass.action || prevPass.coords.length >= 2 || prevPass.pm || prevPass.pr;
+    const previousEvent = events[eventIndex - 1] || null;
+    const shouldMaterialize = hasPrevPassStep && !isPrevPassDuplicateOfEvent(prevPass, previousEvent);
+
+    if (!shouldMaterialize) {
+      expanded.push(event);
+      return;
+    }
+
+    const sentences = splitDescriptionSentences(getEventDescriptionText(event));
+    const consumeLeadingSentence = !prevPass.cue1 && sentences.length > 1;
+    const prevPassCue = prevPass.cue1 || (consumeLeadingSentence ? sentences[0] : "");
+    expanded.push(buildPrevPassTimelineEvent(event, prevPass, prevPassCue, playerById, teams, eventIndex));
+    expanded.push({
+      ...event,
+      prevPassMaterialized: true,
+      omitLeadingSentenceCount: consumeLeadingSentence ? 1 : 0
+    });
+  });
+
+  return expanded;
+}
+
 function buildEventSentenceTimeline(events, baseSnapshots) {
   const timelineEvents = [];
   const timelineSnapshots = [];
@@ -1257,7 +1414,8 @@ function buildEventSentenceTimeline(events, baseSnapshots) {
   events.forEach((event, eventIndex) => {
     const baseSnapshot = baseSnapshots[eventIndex];
     const sentences = splitDescriptionSentences(getEventDescriptionText(event));
-    const steps = sentences.length ? sentences : [stripLeadingCoordsPrefix(getEventDescriptionText(event)) || "Описание отсутствует."];
+    const visibleSentences = sentences.slice(event.omitLeadingSentenceCount || 0);
+    const steps = visibleSentences.length ? visibleSentences : [stripLeadingCoordsPrefix(getEventDescriptionText(event)) || "Описание отсутствует."];
     const sourceEventIndex = getEventSourceIndex(event, eventIndex);
     const isGoal = isGoalEvent(event);
 
@@ -1600,14 +1758,16 @@ async function parseMatchPage() {
     updateProgress("build", `Собираю визуализацию по ${events.length} событиям...`);
     state.text = rendered.text;
     state.teams = extractTeamsFromMatchDoc(pageDoc || logDoc, events);
-    state.teamByPlayerId = inferTeamByPlayer(events, state.teams);
-    state.playerById = buildPlayerInfoById(events);
+    const initialPlayerById = buildPlayerInfoById(events);
+    const timelineEvents = expandEventsWithPrevPassSteps(events, state.teams, initialPlayerById);
+    state.teamByPlayerId = inferTeamByPlayer(timelineEvents, state.teams);
+    state.playerById = buildPlayerInfoById(timelineEvents);
     state.playerPositionById = buildPlayerPositionById(
-      events,
+      timelineEvents,
       extractPositionByPlayerName(pageDoc || logDoc)
     );
-    const baseSnapshots = buildSnapshots(events, state.teams, state.teamByPlayerId, state.playerPositionById);
-    const sentenceTimeline = buildEventSentenceTimeline(events, baseSnapshots);
+    const baseSnapshots = buildSnapshots(timelineEvents, state.teams, state.teamByPlayerId, state.playerPositionById);
+    const sentenceTimeline = buildEventSentenceTimeline(timelineEvents, baseSnapshots);
     state.events = sentenceTimeline.events;
     state.snapshots = sentenceTimeline.snapshots;
     state.score = buildScore(state.events, state.teams);
