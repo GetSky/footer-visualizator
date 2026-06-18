@@ -63,10 +63,18 @@ test("query parameters support full URLs and match ids", () => {
 
 test("event parsers coerce positions, results, and previous pass data", () => {
   assert.deepEqual(parsePositionValue("[(1, 2), (14, 4)]"), [[1, 2], [14, 4]]);
-  assert.deepEqual(parsePrevPassValue("{'pm': 42, 'coord': [[3, 1], [4, 2]]}"), {
-    pm: "42",
-    coords: [[3, 1], [4, 2]]
-  });
+  assert.deepEqual(parsePrevPassValue("{'pm': 42, 'coord': [[3, 1], [4, 2]]}").coords, [[3, 1], [4, 2]]);
+  assert.equal(parsePrevPassValue("{'pm': 42, 'coord': [[3, 1], [4, 2]]}").pm, "42");
+  const flatPrevPass = parsePrevPassValue("{'action': 'naves', 'minute': 33, 'iteration': 1, 'team': 1, 'coord': [[1, 4], [14, 1]], 'pm': 23180, 'pe': 21974, 'pr': 19776, 'well': 1}");
+  assert.equal(flatPrevPass.action, "naves");
+  assert.equal(flatPrevPass.time, 33);
+  assert.equal(flatPrevPass.step, 1);
+  assert.equal(flatPrevPass.teamIndex, 1);
+  assert.equal(flatPrevPass.pm, "23180");
+  assert.equal(flatPrevPass.pe, "21974");
+  assert.equal(flatPrevPass.pr, "19776");
+  assert.equal(flatPrevPass.result, 1);
+  assert.deepEqual(flatPrevPass.coords, [[1, 4], [14, 1]]);
   assert.equal(coerceValue("time", "15"), 15);
   assert.equal(coerceValue("result", "True"), true);
   assert.equal(coerceValue("result", "0"), 0);

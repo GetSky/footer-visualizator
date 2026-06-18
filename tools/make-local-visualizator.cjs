@@ -60,7 +60,7 @@ if (!html.includes(remoteScriptTag)) {
 
 const localHtml = html
   .replaceAll(remoteBaseUrl, localBasePath)
-  .replace(`<script type="module" src="${localBasePath}src/app.js"></script>`, localScriptTag);
+  .replace(`<script type="module" src="${localBasePath}src/app.js"></script>`, () => localScriptTag);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, localHtml, "utf8");
