@@ -43,6 +43,17 @@ function getSnapshotEventPoint(event) {
   return clampSnapshotCoord(coords[0][0], coords[0][1]);
 }
 
+function getSnapshotTeamPoint(event, teamName, teams) {
+  const coords = Array.isArray(event.position) ? event.position : [];
+  if (coords.length === 0) {
+    return null;
+  }
+
+  const teamIndex = teams.indexOf(normalizeText(teamName));
+  const coord = teamIndex >= 0 && coords[teamIndex] ? coords[teamIndex] : coords[0];
+  return clampSnapshotCoord(coord[0], coord[1]);
+}
+
 function getSnapshotPlayerMarkerLabel(player, playerPositionById) {
   if (player && player.id && playerPositionById[player.id]) {
     return playerPositionById[player.id];
@@ -183,7 +194,8 @@ export function buildSnapshots(events, teams, teamByPlayerId, playerPositionById
 
     if (opponent && opponent.id && coordsPair.to && isFailedPassResult(event.result)) {
       const opponentTeam = teamByPlayerId[opponent.id] || getSnapshotOtherTeam(team, teams);
-      knownPlayersById[opponent.id] = makeSnapshotPlayerState(opponent, opponentTeam, coordsPair.to[0], coordsPair.to[1], "opponent", event.index, opponentTeam, playerPositionById);
+      const opponentPoint = getSnapshotTeamPoint(event, opponentTeam, teams) || coordsPair.to;
+      knownPlayersById[opponent.id] = makeSnapshotPlayerState(opponent, opponentTeam, opponentPoint[0], opponentPoint[1], "opponent", event.index, opponentTeam, playerPositionById);
     }
 
     snapshots.push({

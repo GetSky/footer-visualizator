@@ -166,6 +166,25 @@ test("snapshots keep current and known player positions", () => {
   assert.equal(snapshots[1].previousPlayersById["10"].name, "Alice Smith");
 });
 
+test("failed pass stores opponent position in opponent team coordinates", () => {
+  const events = [
+    {
+      index: 0,
+      team: "Away",
+      action: "short_pass",
+      player_with_ball: "20 Away Passer",
+      opponent: "10 Home Interceptor",
+      position: [[14, 3], [1, 2]],
+      result: 7
+    }
+  ];
+  const teamByPlayer = inferTeamByPlayer(events, teams);
+  const snapshots = buildSnapshots(events, teams, teamByPlayer);
+
+  assert.equal(teamByPlayer["10"], "Home");
+  assert.deepEqual([snapshots[0].playersById["10"].row, snapshots[0].playersById["10"].col], [14, 3]);
+});
+
 test("field geometry clamps coordinates and maps special points", () => {
   assert.deepEqual(clampCoord(99, -3), [14, 1]);
   assert.deepEqual(getCoordsPair({ position: [[1, 1], [20, 7]] }), {
