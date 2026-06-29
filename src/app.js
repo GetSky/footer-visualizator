@@ -459,7 +459,7 @@ function getMixedNavesShotPassInfo(snapshot) {
   }
 
   return {
-    fromPoint: [previousState.row, previousState.col],
+    fromPoint: toPoint,
     toPoint,
     passer,
     team: previousState.team || state.teamByPlayerId[passer.id] || normalizeText(snapshot.event.team)
@@ -476,14 +476,36 @@ function getMixedNavesShotPasserMarker(snapshot) {
     ...makePlayerState(
       passInfo.passer,
       passInfo.team,
-      passInfo.fromPoint[0],
-      passInfo.fromPoint[1],
+      passInfo.toPoint[0],
+      passInfo.toPoint[1],
       "mixed-passer",
       snapshot.event.index,
       passInfo.team
     ),
     markerId: `mixed-passer:${snapshot.event.index}:${passInfo.passer.id || passInfo.passer.name}`,
     markerPhase: "overlay",
+    isMixedPasser: true
+  };
+}
+
+function getUpcomingMixedNavesShotPasserMarker(nextSnapshot) {
+  const passInfo = getMixedNavesShotPassInfo(nextSnapshot);
+  if (!passInfo) {
+    return null;
+  }
+
+  return {
+    ...makePlayerState(
+      passInfo.passer,
+      passInfo.team,
+      passInfo.toPoint[0],
+      passInfo.toPoint[1],
+      "mixed-passer",
+      nextSnapshot.event.index,
+      passInfo.team
+    ),
+    markerId: `next-mixed-passer:${nextSnapshot.event.index}:${passInfo.passer.id || passInfo.passer.name}`,
+    markerPhase: "next",
     isMixedPasser: true
   };
 }
@@ -1095,6 +1117,11 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     entries.push(shotGoalkeeper);
   }
 
+  const upcomingMixedPasser = !isFoulFrame ? getUpcomingMixedNavesShotPasserMarker(nextSnapshot) : null;
+  if (upcomingMixedPasser) {
+    entries.push(upcomingMixedPasser);
+  }
+
   const shouldHideNextKickoffPlayer = currentSnapshot
     && nextSnapshot
     && isPendingGoalSentence(currentSnapshot.event)
@@ -1105,7 +1132,8 @@ function renderMarkers(currentSnapshot, nextSnapshot) {
     && !(currentSnapshot && currentSnapshot.event && currentSnapshot.event.isPrevPassStep)
     && currentAction !== "розыгрыш"
     && !isPassFollowedByFoul(currentSnapshot, nextSnapshot)
-    && !isCornerKickNavesShotEvent(nextSnapshot.event);
+    && !isCornerKickNavesShotEvent(nextSnapshot.event)
+    && !isNavesShotEvent(nextSnapshot.event);
 
   if (shouldRenderNextSnapshotPlayers) {
     Object.values(nextSnapshot.players).forEach((player) => {
