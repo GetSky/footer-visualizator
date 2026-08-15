@@ -10,7 +10,6 @@ on:
 env:
   REGISTRY: ghcr.io
   SERVICE_DIR: /opt/footter-proxy-match
-  DOMAIN: getsky.tech
 
 jobs:
   build-and-push:
@@ -58,7 +57,6 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}:latest
-          DOMAIN: ${{ env.DOMAIN }}
           SERVICE_DIR: ${{ env.SERVICE_DIR }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
@@ -66,7 +64,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: IMAGE,DOMAIN,SERVICE_DIR,GHCR_USERNAME,GHCR_TOKEN
+          envs: IMAGE,SERVICE_DIR,GHCR_USERNAME,GHCR_TOKEN
           script: |
             set -eu
             mkdir -p "$SERVICE_DIR"
@@ -85,21 +83,19 @@ jobs:
                 container_name: footter-proxy-match
                 restart: unless-stopped
                 environment:
-                  ACME_DOMAIN: ${DOMAIN}
-                  ACME_CACHE_DIR: /var/lib/footter-proxy-match/certs
                   HTTP_ADDR: :80
-                  TLS_ADDR: :443
-                ports:
-                  - "80:80"
-                  - "443:443"
-                volumes:
-                  - /var/lib/footter-proxy-match/certs:/var/lib/footter-proxy-match/certs
+                networks:
+                  - proxy-net
                 healthcheck:
                   test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
                   interval: 30s
                   timeout: 5s
                   retries: 3
                   start_period: 10s
+
+            networks:
+              proxy-net:
+                external: true
             EOF
             docker compose pull
             docker compose up -d
