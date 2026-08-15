@@ -83,7 +83,7 @@ jobs:
                 container_name: footter-proxy-match
                 restart: unless-stopped
                 environment:
-                  HTTP_ADDR: :80
+                  LISTEN_ADDR: :80
                 networks:
                   - proxy-net
                 healthcheck:
